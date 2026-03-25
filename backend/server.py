@@ -41,13 +41,7 @@ def load_config() -> dict:
 
 config = load_config()
 GROQ_KEYS = config.get("groq_keys", [])
-POLLINATIONS_KEYS = config.get("pollinations_keys", [
-    "sk_QZEKTfnghsiUTNH5wVZ4uL7bYZmzsRAu",
-    "sk_FBPT5me4vwsZJSVpATIorgC8sPDSvDTo",
-    "sk_ngA7UYkUveZBvAFNilx5jnKxvr6BOW8z",
-    "sk_a82JJY74rP8pP1fwIpB7lkhrCMBHADKE",
-    "sk_m0lXVlnX26OBGAr2TmAztk318osMzaU7",
-])
+POLLINATIONS_KEYS = config.get("pollinations_keys", [])
 OR_KEY = config.get("openrouter_key", "")
 OR_REFERER = config.get("openrouter_referer", "https://saurabh-ai.app")
 OR_TITLE = config.get("openrouter_title", "Saurabh AI")
