@@ -63,7 +63,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
 .sp-status{font-size:10px;color:var(--text3);margin-top:10px;letter-spacing:2px;animation:fadeUp .5s .8s both}
 
 /* ── SIDEBAR ── */
-.sidebar{width:264px;flex-shrink:0;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100dvh;position:relative;overflow:hidden}
+.sidebar{width:264px;flex-shrink:0;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100dvh;position:relative;overflow:hidden;transition:transform .3s cubic-bezier(.4,0,.2,1)}
+.sidebar.closed{transform:translateX(-100%);border-right:none}
+.sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40;display:none;transition:opacity .3s}
+.sidebar-overlay.show{display:block;opacity:1}
 .sidebar::before{content:'';position:absolute;top:0;left:0;right:0;height:220px;background:radial-gradient(ellipse at 50% 0%,rgba(212,132,90,.07) 0%,transparent 70%);pointer-events:none;z-index:0}
 .sb-head{padding:18px 14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;position:relative;z-index:1;flex-shrink:0}
 .sb-head::after{content:'';position:absolute;bottom:0;left:14px;right:14px;height:1px;background:linear-gradient(90deg,transparent,var(--a)44,transparent)}
@@ -75,8 +78,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
 .sb-logo-sub{font-size:8px;letter-spacing:3px;color:var(--text3);text-transform:uppercase;margin-top:3px}
 .sb-new{display:flex;align-items:center;gap:9px;padding:10px 12px;margin:10px 8px 4px;border-radius:10px;border:none;background:transparent;color:var(--text2);font-size:13px;cursor:pointer;width:calc(100% - 16px);font-family:'DM Sans',sans-serif;transition:all .15s;position:relative;z-index:1}
 .sb-new:hover{background:var(--surface);color:var(--text)}
-.sb-section{padding:8px 14px 4px;font-size:9px;color:var(--text3);font-weight:600;letter-spacing:2px;text-transform:uppercase;position:relative;z-index:1}
-.chats-list{flex:1;overflow-y:auto;padding:2px 8px;position:relative;z-index:1}
+.sb-section{padding:8px 14px 4px;font-size:9px;color:var(--text3);font-weight:600;letter-spacing:2px;text-transform:uppercase;position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between}
+.chats-toggle{display:flex;align-items:center;justify-content:center;gap:4px;cursor:pointer;padding:4px 8px;border-radius:6px;transition:all .2s}
+.chats-toggle:hover{background:var(--surface)}
+.chats-toggle svg{transition:transform .3s ease}
+.chats-list{flex:1;padding:2px 8px;position:relative;z-index:1;max-height:0;opacity:0;transition:all .3s ease;overflow:hidden}
+.chats-list.open{max-height:500px;opacity:1;overflow-y:auto}
 .chats-list::-webkit-scrollbar{width:2px}
 .chats-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 .chat-item{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:9px;cursor:pointer;margin-bottom:1px;transition:all .15s;position:relative}
@@ -120,12 +127,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
 .profile-divider{height:1px;background:var(--border);margin:6px 14px}
 
 /* ── MAIN ── */
-.main{flex:1;display:flex;flex-direction:column;height:100dvh;min-width:0;overflow:hidden}
+.main{flex:1;display:flex;flex-direction:column;height:100dvh;min-width:0;overflow:hidden;transition:all .3s cubic-bezier(.4,0,.2,1)}
+.main.full-width{margin-left:0;width:100vw}
+
+/* Desktop sidebar toggle */
+@media(min-width:701px){
+  .sidebar{position:absolute;left:0;top:0;bottom:0;z-index:100;transition:transform .3s}
+  .sidebar.closed{transform:translateX(-100%);width:264px}
+  .sidebar:not(.closed){transform:translateX(0)}
+  .main{width:calc(100vw - 264px);transition:width .3s;margin-left:264px}
+  .main.full-width{width:100vw;margin-left:0}
+}
 
 /* ── TOPBAR ── */
 .topbar{height:58px;display:flex;align-items:center;padding:0 18px;border-bottom:1px solid var(--border);flex-shrink:0;position:relative;z-index:10;gap:12px;background:rgba(6,6,10,.85);backdrop-filter:blur(20px)}
 .topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--a)44,var(--a3)66,var(--a)44,transparent)}
-.mob-btn{display:none;background:none;border:none;color:var(--text2);cursor:pointer;padding:6px;border-radius:8px;transition:all .15s}
+.mob-btn{background:none;border:none;color:var(--text2);cursor:pointer;padding:6px;border-radius:8px;transition:all .15s;display:flex;align-items:center;justify-content:center}
 .mob-btn:hover{color:var(--text);background:var(--surface)}
 .tb-center{flex:1;display:flex;align-items:center;justify-content:center}
 .pill{display:inline-flex;align-items:center;gap:7px;padding:5px 14px 5px 10px;background:rgba(255,255,255,.03);border:1px solid var(--border2);border-radius:20px;cursor:pointer;font-size:12px;font-weight:500;color:var(--text2);font-family:'DM Sans',sans-serif;transition:all .2s;user-select:none;position:relative}
@@ -281,6 +298,15 @@ textarea::placeholder{color:var(--text3)}
 .modal-btn.confirm{background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;box-shadow:0 4px 16px rgba(239,68,68,.3)}
 .modal-btn.confirm:hover{background:linear-gradient(135deg,#f87171,#ef4444);transform:scale(1.02)}
 
+/* Chat History Modal */
+.chat-history-modal{width:min(600px,90vw);max-height:80vh;display:flex;flex-direction:column}
+.chat-history-modal .modal-title{margin-bottom:16px}
+.chat-history-list{flex:1;overflow-y:auto;max-height:400px;padding-right:8px}
+.chat-history-item{padding:12px;margin-bottom:8px;background:var(--surface2);border-radius:10px;border:1px solid var(--border)}
+.chat-history-item .chi-time{font-size:10px;color:var(--text3);margin-bottom:4px}
+.chat-history-item .chi-preview{font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-history-empty{text-align:center;padding:40px;color:var(--text3)}
+
 /* ── DELETE POPUP ── */
 .del-popup{position:fixed;z-index:999;background:var(--surface);border:1px solid var(--border2);border-radius:13px;padding:5px;box-shadow:0 16px 48px rgba(0,0,0,.85);display:none;min-width:155px;animation:slideIn .18s ease}
 .del-popup.show{display:block}
@@ -299,9 +325,11 @@ textarea::placeholder{color:var(--text3)}
 .mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:40;backdrop-filter:blur(4px)}
 @media(max-width:700px){
   .sidebar{position:fixed;left:-270px;top:0;bottom:0;z-index:50;transition:left .28s cubic-bezier(.4,0,.2,1)}
-  .sidebar.open{left:0;box-shadow:12px 0 50px rgba(0,0,0,.8)}
+  .sidebar.open{left:0;box-shadow:12px 0 50px rgba(0,0,.8)}
+  .sidebar.closed{left:-270px}
+  .main.full-width{width:100%}
   .mob-overlay.show{display:block}
-  .mob-btn{display:flex}
+  .chats-toggle{display:flex}
   .msg-row{padding:8px 14px}
   .input-area{padding:10px 12px 16px}
   .pill-drop{width:min(310px,95vw)}
@@ -368,13 +396,18 @@ textarea::placeholder{color:var(--text3)}
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="14" height="16" rx="2"/><path d="M17 5h3l3 3v10a2 2 0 01-2 2h-4"/><path d="M7 10h7M7 13h5"/><path d="M19 15v6m-3-3h6"/></svg>
     New Chat
   </button>
-  <div class="sb-section">Chats</div>
+  <div class="sb-section">
+    <span>Chats</span>
+    <div class="chats-toggle" onclick="toggleChats()" title="Toggle Chat List" id="chatsToggleBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+  </div>
   <div class="chats-list" id="chatsList"><div style="padding:12px 10px;font-size:13px;color:var(--text3)">No old chats</div></div>
   <div class="sb-foot" onclick="openProfile()">
     <div class="profile-circle">S</div>
     <div>
-      <div class="sb-foot-name">Saurabh AI</div>
-      <div class="sb-foot-sub">Developed by Saurabh</div>
+      <div class="sb-foot-name" id="sidebarUserName">Saurabh AI</div>
+      <div class="sb-foot-sub" id="sidebarUserEmail">Developed by Saurabh</div>
     </div>
     <svg style="margin-left:auto;color:var(--text3)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
   </div>
@@ -385,10 +418,10 @@ textarea::placeholder{color:var(--text3)}
   <div class="profile-overlay" onclick="closeProfile()"></div>
   <div class="profile-drawer">
     <div class="profile-header">
-      <div class="profile-avatar-big">S</div>
+      <div class="profile-avatar-big" id="profileAvatarBig">S</div>
       <div>
-        <div class="profile-name">Saurabh AI</div>
-        <div class="profile-tagline">Developed by Saurabh</div>
+        <div class="profile-name" id="profileNameBig">Saurabh AI</div>
+        <div class="profile-tagline" id="profileTagline">Developed by Saurabh</div>
       </div>
       <button class="profile-close" onclick="closeProfile()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -409,18 +442,6 @@ textarea::placeholder{color:var(--text3)}
       <div class="toggle-wrap"><button class="toggle on" id="themeToggle"></button></div>
     </div>
 
-    <!-- Sound Toggle -->
-    <div class="profile-item" onclick="toggleSound()">
-      <div class="profile-item-icon">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-      </div>
-      <div class="profile-item-info">
-        <div class="profile-item-name">Typing Sound</div>
-        <div class="profile-item-desc">Tip-tip sound on AI response</div>
-      </div>
-      <div class="toggle-wrap"><button class="toggle" id="soundToggle"></button></div>
-    </div>
-
     <!-- Response Style -->
     <div class="profile-item" onclick="cycleResponseStyle()">
       <div class="profile-item-icon">
@@ -435,27 +456,6 @@ textarea::placeholder{color:var(--text3)}
 
     <div class="profile-divider"></div>
 
-    <div class="profile-section">Memory</div>
-
-    <div class="profile-item">
-      <div class="profile-item-icon" style="background:rgba(168,85,247,.1);border-color:rgba(168,85,247,.2)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 2v10l4.5 4.5"/></svg>
-      </div>
-      <div class="profile-item-info">
-        <div class="profile-item-name">Remembered Topics</div>
-        <div class="profile-item-desc" id="memoryTopicsSummary">No topics saved yet</div>
-      </div>
-    </div>
-
-    <div class="profile-item" onclick="clearMemory()">
-      <div class="profile-item-icon" style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.15)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.8" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
-      </div>
-      <div class="profile-item-info">
-        <div class="profile-item-name" style="color:#ef4444">Clear Memory</div>
-        <div class="profile-item-desc">Delete all remembered topics</div>
-      </div>
-    </div>
     <div class="profile-section">About You</div>
 
     <div class="profile-item" onclick="editUserProfile()">
@@ -528,29 +528,6 @@ textarea::placeholder{color:var(--text3)}
       </div>
     </div>
 
-    <div class="profile-divider"></div>
-
-    <div class="profile-section">Memory</div>
-
-    <div class="profile-item">
-      <div class="profile-item-icon" style="background:rgba(168,85,247,.1);border-color:rgba(168,85,247,.2)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 2v10l4.5 4.5"/></svg>
-      </div>
-      <div class="profile-item-info">
-        <div class="profile-item-name">Remembered Topics</div>
-        <div class="profile-item-desc" id="memoryTopicsSummary">No topics saved yet</div>
-      </div>
-    </div>
-
-    <div class="profile-item" onclick="clearMemory()">
-      <div class="profile-item-icon" style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.15)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.8" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
-      </div>
-      <div class="profile-item-info">
-        <div class="profile-item-name" style="color:#ef4444">Clear Memory</div>
-        <div class="profile-item-desc">Delete all remembered topics</div>
-      </div>
-    </div>
     <div class="profile-section">Status</div>
 
     <!-- API Status -->
@@ -565,29 +542,17 @@ textarea::placeholder{color:var(--text3)}
       <div style="width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:8px;box-shadow:0 0 6px #22c55e"></div>
     </div>
 
-    <div class="profile-divider"></div>
-
-    <div class="profile-section">Memory</div>
-
-    <div class="profile-item">
-      <div class="profile-item-icon" style="background:rgba(168,85,247,.1);border-color:rgba(168,85,247,.2)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 2v10l4.5 4.5"/></svg>
+    <!-- Logout Button -->
+    <div class="profile-item" onclick="logout()" style="margin: 8px 14px; border-radius: 12px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2);">
+      <div class="profile-item-icon" style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.8" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
       </div>
       <div class="profile-item-info">
-        <div class="profile-item-name">Remembered Topics</div>
-        <div class="profile-item-desc" id="memoryTopicsSummary">No topics saved yet</div>
+        <div class="profile-item-name" style="color: #ef4444;">Logout</div>
+        <div class="profile-item-desc">Sign out of your account</div>
       </div>
     </div>
 
-    <div class="profile-item" onclick="clearMemory()">
-      <div class="profile-item-icon" style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.15)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.8" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
-      </div>
-      <div class="profile-item-info">
-        <div class="profile-item-name" style="color:#ef4444">Clear Memory</div>
-        <div class="profile-item-desc">Delete all remembered topics</div>
-      </div>
-    </div>
     <div style="padding:14px;text-align:center;font-size:10px;color:var(--text3);letter-spacing:1px">Saurabh AI v2.0</div>
   </div>
 </div>
@@ -622,6 +587,17 @@ textarea::placeholder{color:var(--text3)}
   </div>
 </div>
 
+<!-- Chat History Modal -->
+<div class="modal-overlay" id="chatHistoryModal">
+  <div class="modal chat-history-modal">
+    <div class="modal-title">Chat History</div>
+    <div class="chat-history-list" id="chatHistoryList"></div>
+    <div class="modal-btns">
+      <button class="modal-btn cancel" onclick="closeChatHistory()">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="mob-overlay" id="mobOverlay" onclick="closeSidebar()"></div>
 
 <!-- ── MAIN ── -->
@@ -630,7 +606,7 @@ textarea::placeholder{color:var(--text3)}
 
   <!-- TOPBAR -->
   <div class="topbar">
-    <button class="mob-btn" onclick="openSidebar()">
+    <button class="mob-btn" onclick="toggleSidebar()" title="Toggle Sidebar">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     </button>
     <div class="tb-center">
@@ -776,10 +752,585 @@ textarea::placeholder{color:var(--text3)}
 
 <script>
 /* ═══════════════════════════════════════
+   SAURABH AI - FULL CONVERSATION MEMORY SYSTEM v3.0
+   Stores full conversations + user profile + smart recall
+══════════════════════════════════════ */
+
+const MEMORY_KEY = 'sai7_memory_v3';
+
+// Enhanced Memory Structure
+const DEFAULT_MEMORY = {
+  profile: {
+    name: '',
+    occupation: '',
+    bio: '',
+    location: '',
+    interests: [],
+    otherFacts: {}
+  },
+  conversations: [],
+  importantFacts: [],
+  lastUpdated: Date.now()
+};
+
+// Load Memory from localStorage
+function loadMemory() {
+  try {
+    const saved = localStorage.getItem(MEMORY_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Migrate old format if needed
+      if (parsed.importantTopics && !parsed.conversations) {
+        return migrateOldMemory(parsed);
+      }
+      return parsed;
+    }
+  } catch(e) { console.log('Memory load error:', e); }
+  return JSON.parse(JSON.stringify(DEFAULT_MEMORY));
+}
+
+// Save Memory to localStorage
+function saveMemory() {
+  try {
+    memory.lastUpdated = Date.now();
+    localStorage.setItem(MEMORY_KEY, JSON.stringify(memory));
+  } catch(e) { console.log('Memory save error:', e); }
+}
+
+let memory = loadMemory();
+
+// Initialize Memory
+function initMemory() {
+  memory = loadMemory();
+  updateMemorySummary();
+  console.log('Memory initialized:', memory.profile.name ? 'User: ' + memory.profile.name : 'No user info yet');
+}
+
+/* ═══════════════════════════════════════
+   USER PROFILE EXTRACTION - Enhanced Patterns
+══════════════════════════════════════ */
+
+// Enhanced Name Patterns - Support for Hinglish and casual speech
+const NAME_PATTERNS = [
+  // Formal: "My name is Saurabh"
+  /(?:my name is|i am|i'? ?m|mera naam(?:mera)?|main)\s+(?:hu[an]|hoon\s+)?(\w+)/i,
+  // "I am Saurabh" - direct
+  /^i am (\w+)$/i,
+  // "Mera naam Saurabh hai"
+  /(?:mera naam|mera\s+naam)\s+(\w+)\s+(?:hai|hoon)/i,
+  // "Main Saurabh hoon"
+  /^main\s+(\w+)\s+hoon$/i,
+  // "Saurabh bol" - direct name mention
+  /^(\w{3,})\s+(?:bola|boli|bolte)$/i,
+  // "I am called Saurabh"
+  /(?:i am|i'? ?m)\s+(?:called|named|known as)\s+(\w+)/i,
+  // "Saurabh hai mera naam"
+  /^(\w+)\s+(?:hai|hoon)\s+(?:mera|my)\s+(?:naam|name)$/i,
+  // "They call me Saurabh" / "log bolte hain Saurabh"
+  /(?:they\s+call|logo\s+bolte?)\s*(?:me|mujhe|mujhe)\s+(\w+)/i,
+  // "Saurabh" alone as self-introduction
+  /^saurabh$/i,
+  // Name with period at end
+  /^(\w+)\.$/i
+];
+
+// Enhanced Occupation Patterns
+const OCCUPATION_PATTERNS = [
+  /(?:i am|i'? ?m|main|mein)\s+(?:a\s+)?(?:student|worker|developer|engineer|teacher|doctor|designer|freelancer|entrepreneur|businessman|businesswoman|coder|programmer|blogger|vlogger|youtuber|artist|writer)/i,
+  /(?:mera|my)\s+(?:kaam|occupation|job)\s+(?:hai|hoon)\s+(\w+)/i,
+  /(?:main|mein)\s+(?:student|worker|developer|engineer|teacher|doctor|designer|freelancer|entrepreneur|businessman|businesswoman|coder|programmer)\s+(?:hu[an]|hoon)/i
+];
+
+// Location Patterns
+const LOCATION_PATTERNS = [
+  /(?:i am|i'? ?m|main|mein)\s+(?:from|in)\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)/i,
+  /(?:mera|my)\s+(?:shahar|shaher|city|town|gaon|gaon)\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)/i,
+  /(?:main|mein)\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)\s+(?:mein|se|ka hu)/i,
+  /(?:rehta|rehti|rhta|rhti)\s+(?:hu[an]|hoon)\s+(?:in\s+)?([A-Za-z]+(?:\s+[A-Za-z]+)?)/i,
+  /(?:delhi|mumbai|bangalore|hyderabad|chennai|kolkata|jaipur|pune|agra|lucknow|kanpur)/i
+];
+
+// Check if message is asking about user info (recall question)
+function isRecallQuestion(msg) {
+  const recallQuestionPatterns = [
+    /^mera\s+naam\s+kya\s+(?:hai|hoon)/i,
+    /^my\s+name\s+(?:is\s+)?what/i,
+    /kya\s+(?:tumhara|aapka|mera)\s+naam/i,
+    /^what\s+is\s+my\s+name/i,
+    /^who\s+am\s+i/i,
+    /^aap\s+kaun\s+ho/i,
+    /tum\s+kaun\s+ho/i,
+    /^mera\s+kaam\s+kya\s+(?:hai|hoon)/i,
+    /^what\s+is\s+my\s+(?:job|occupation|work)/i,
+    /^where\s+(?:do\s+)?(?:you|i)\s+(?:live|come\s+from)/i,
+    /^mera\s+(?:gaon|shahar|city)\s+kaha[ns]/i
+  ];
+  
+  for (const pattern of recallQuestionPatterns) {
+    if (pattern.test(msg)) return true;
+  }
+  return false;
+}
+
+// Extract User Info from Message
+function extractUserInfo(message) {
+  const msg = message.trim();
+  const msgLower = msg.toLowerCase();
+  let updated = false;
+  
+  // Skip extraction for recall questions - don't overwrite name with "Kya" from "mera naam kya hai"
+  if (isRecallQuestion(msg)) {
+    console.log('Skipping name extraction - recall question detected');
+    return false;
+  }
+  
+  // Extract Name
+  for (const pattern of NAME_PATTERNS) {
+    const match = msg.match(pattern);
+    if (match && match[1]) {
+      const potentialName = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+      // Skip common non-name words and recall questions
+      const skipWords = ['the', 'a', 'an', 'is', 'am', 'are', 'from', 'not', 'none', 'nothing', 'what', 'your', 'you', 'kya', 'kaun', 'kisko', 'kisi', 'batao', 'bol', 'batana', 'kaha', 'kahan', 'kitna', 'kaise'];
+      if (!skipWords.includes(potentialName.toLowerCase()) && potentialName.length >= 2) {
+        if (memory.profile.name !== potentialName) {
+          memory.profile.name = potentialName;
+          updated = true;
+          console.log('Name extracted:', potentialName);
+        }
+        break;
+      }
+    }
+  }
+  
+  // Also check for standalone "Saurabh" or similar names
+  if (!memory.profile.name) {
+    const simpleNameMatch = msg.match(/^([A-Z][a-z]{2,})$/);
+    if (simpleNameMatch) {
+      memory.profile.name = simpleNameMatch[1];
+      updated = true;
+      console.log('Name extracted (simple):', simpleNameMatch[1]);
+    }
+  }
+  
+  // Extract Occupation
+  for (const pattern of OCCUPATION_PATTERNS) {
+    const match = msg.match(pattern);
+    if (match) {
+      let occupation = match[0].match(/(?:student|worker|developer|engineer|teacher|doctor|designer|freelancer|entrepreneur|businessman|businesswoman|coder|programmer|blogger|vlogger|youtuber|artist|writer)/i);
+      if (occupation) {
+        occupation = occupation[0].toLowerCase();
+        if (memory.profile.occupation !== occupation) {
+          memory.profile.occupation = occupation;
+          updated = true;
+          console.log('Occupation extracted:', occupation);
+        }
+        break;
+      }
+    }
+  }
+  
+  // Extract Location
+  for (const pattern of LOCATION_PATTERNS) {
+    const match = msg.match(pattern);
+    if (match && match[1]) {
+      const location = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+      if (memory.profile.location !== location) {
+        memory.profile.location = location;
+        updated = true;
+        console.log('Location extracted:', location);
+      }
+      break;
+    }
+  }
+  
+  if (updated) {
+    saveMemory();
+    updateMemorySummary();
+  }
+  
+  return updated;
+}
+
+/* ═══════════════════════════════════════
+   CONVERSATION STORAGE
+══════════════════════════════════════ */
+
+// Get current conversation or create new
+function getCurrentConversation() {
+  const chatId = AppState.chatId || 'c' + Date.now();
+  let conv = memory.conversations.find(c => c.id === chatId);
+  
+  if (!conv) {
+    conv = {
+      id: chatId,
+      date: Date.now(),
+      messages: [],
+      summary: '',
+      topics: []
+    };
+    memory.conversations.push(conv);
+  }
+  
+  return conv;
+}
+
+// Save user message to conversation
+function saveUserMessage(message) {
+  const conv = getCurrentConversation();
+  conv.messages.push({
+    role: 'user',
+    content: message.substring(0, 500),
+    timestamp: Date.now()
+  });
+  saveMemory();
+}
+
+// Save AI response to conversation
+function saveAssistantMessage(message) {
+  const conv = getCurrentConversation();
+  conv.messages.push({
+    role: 'assistant',
+    content: message.substring(0, 1000),
+    timestamp: Date.now()
+  });
+  
+  // Update conversation summary based on recent messages
+  if (conv.messages.length >= 2) {
+    const lastUser = conv.messages.filter(m => m.role === 'user').slice(-1)[0];
+    if (lastUser) {
+      conv.summary = 'User asked about: ' + lastUser.content.substring(0, 50) + (lastUser.content.length > 50 ? '...' : '');
+    }
+  }
+  
+  saveMemory();
+}
+
+// Extract topics from message
+function extractTopics(message) {
+  const topics = [];
+  const topicKeywords = [
+    'python', 'javascript', 'java', 'coding', 'programming', 'website', 'app',
+    'maths', 'science', 'physics', 'chemistry', 'biology', 'history', 'geography',
+    'taj mahal', 'india', 'delhi', 'mumbai', 'bollywood', 'hollywood',
+    'ai', 'chatgpt', 'machine learning', 'data science',
+    'exam', 'college', 'iit', 'jee', 'neet', 'board',
+    'job', 'career', 'business', 'startup', 'money', 'investment',
+    'travel', 'tourism', 'food', 'health', 'fitness', 'yoga',
+    'game', 'cricket', 'football', 'sports', 'hobby'
+  ];
+  
+  const msgLower = message.toLowerCase();
+  for (const topic of topicKeywords) {
+    if (msgLower.includes(topic)) {
+      topics.push(topic);
+    }
+  }
+  
+  return topics;
+}
+
+/* ═══════════════════════════════════════
+   SMART RECALL SYSTEM
+══════════════════════════════════════ */
+
+// Check if user is asking to recall something
+const RECALL_PATTERNS = [
+  // Hindi/English recall patterns
+  /kya.*yaad.*(hai|tha)/i,
+  /kal.*kya.*(hua|kiya|poocha)/i,
+  /pehle.*kya.*(poocha|baat.*ki|discuss.*ki)/i,
+  /subah.*kya.*(hua|kiya)/i,
+  /raat.*kya.*(hua|kiya)/i,
+  /maine.*kya.*(poocha|baat.*ki|seekha)/i,
+  /phle.*kya.*(bola|tha)/i,
+  /do you remember/i,
+  /yaad.*hai.*(tumko|mujhe|aapko)/i,
+  /what.*did.*(i|we).*discuss.*(before|earlier|last)/i,
+  /previous.*(chat|conversation|topic|question)/i,
+  /last.*(chat|conversation|topic|question)/i,
+  /earlier.*(chat|conversation|topic)/i,
+  /before.*(this|that).*(chat|conversation|topic)/i,
+  /mera.*naam.*kya.*hai/i,
+  /what.*is.*my.*name/i,
+  /kya.*mera.*naam/i,
+  // Questions about past topics
+  /(?:baare|baarein|bare).*(mein|mein).*(batana|bolna| batao)/i,
+  /(?:discuss|baat|chat|poocha).*(pehle|kal|previous)/i
+];
+
+function isRecallQuery(query) {
+  for (const pattern of RECALL_PATTERNS) {
+    if (pattern.test(query)) return true;
+  }
+  return false;
+}
+
+// Get relevant context from past conversations
+function getRelevantContext(query) {
+  let context = '';
+  const queryLower = query.toLowerCase();
+  
+  // Check all conversations
+  const allConversations = [...memory.conversations].sort((a, b) => b.date - a.date);
+  
+  // Find conversations with relevant topics
+  for (const conv of allConversations.slice(0, 5)) {
+    const convDaysAgo = Math.floor((Date.now() - conv.date) / (1000 * 60 * 60 * 24));
+    const timeLabel = convDaysAgo === 0 ? 'aaj' : convDaysAgo === 1 ? 'kal' : convDaysAgo + ' din pehle';
+    
+    // Check if this conversation has relevant content
+    for (const msg of conv.messages) {
+      const msgLower = msg.content.toLowerCase();
+      
+      // Check keyword matches
+      const keywords = queryLower.split(/\s+/).filter(w => w.length > 3);
+      for (const kw of keywords) {
+        if (msgLower.includes(kw) && !['what', 'how', 'why', 'kya', 'hai', 'the', 'and', 'for'].includes(kw)) {
+          // Found relevant content!
+          if (msg.role === 'user') {
+            context += '\n' + timeLabel + ' aapne poocha tha: "' + msg.content.substring(0, 100) + '"\n';
+          } else {
+            context += 'uska jawaab tha: "' + msg.content.substring(0, 100) + '"\n';
+          }
+          break;
+        }
+      }
+    }
+    
+    // Check for specific recall patterns
+    if (isRecallQuery(query)) {
+      if (conv.summary) {
+        context += '\n' + timeLabel + ' baat hui thi: ' + conv.summary + '\n';
+      }
+      // Include last few messages
+      const recentMsgs = conv.messages.slice(-4);
+      for (const msg of recentMsgs) {
+        const role = msg.role === 'user' ? 'Aap' : 'Main';
+        context += role + ': "' + msg.content.substring(0, 80) + '"\n';
+      }
+    }
+  }
+  
+  return context;
+}
+
+// Get full context for system prompt
+function getMemoryContext(query) {
+  let context = '';
+  
+  // 1. User Profile
+  if (memory.profile.name || memory.profile.occupation || memory.profile.location) {
+    context += '\n===== USER PROFILE =====\n';
+    if (memory.profile.name) context += 'Name: ' + memory.profile.name + '\n';
+    if (memory.profile.occupation) context += 'Occupation: ' + memory.profile.occupation + '\n';
+    if (memory.profile.location) context += 'Location: ' + memory.profile.location + '\n';
+    context += '===== END USER PROFILE =====\n';
+  }
+  
+  // 2. Recent Conversations Context
+  if (memory.conversations.length > 0) {
+    const recentConv = memory.conversations[memory.conversations.length - 1];
+    const convDaysAgo = Math.floor((Date.now() - recentConv.date) / (1000 * 60 * 60 * 24));
+    
+    if (convDaysAgo <= 7 && recentConv.messages.length > 0) {
+      context += '\n===== RECENT CONVERSATION =====\n';
+      if (convDaysAgo === 0) context += '(Aaj hi)\n';
+      else if (convDaysAgo === 1) context += '(Kal)\n';
+      else context += '(' + convDaysAgo + ' din pehle)\n';
+      
+      // Show last 4 messages
+      const recentMsgs = recentConv.messages.slice(-4);
+      for (const msg of recentMsgs) {
+        const role = msg.role === 'user' ? 'User' : 'AI';
+        context += role + ': ' + msg.content.substring(0, 100) + '\n';
+      }
+      context += '===== END RECENT CONVERSATION =====\n';
+    }
+  }
+  
+  // 3. Recall Context (if asking about past)
+  if (isRecallQuery(query)) {
+    const recallContext = getRelevantContext(query);
+    if (recallContext) {
+      context += '\n===== MEMORY RECALL =====\n';
+      context += recallContext;
+      context += '===== END MEMORY =====\n';
+    }
+  }
+  
+  // 4. Important Facts
+  if (memory.importantFacts.length > 0) {
+    context += '\n===== IMPORTANT FACTS ABOUT USER =====\n';
+    for (const fact of memory.importantFacts.slice(-5)) {
+      context += '- ' + fact.fact + ' (' + getTimeAgo(fact.timestamp) + ')\n';
+    }
+    context += '===== END IMPORTANT FACTS =====\n';
+  }
+  
+  return context;
+}
+
+/* ═══════════════════════════════════════
+   IMPORTANT FACTS EXTRACTION
+══════════════════════════════════════ */
+
+const FACT_PATTERNS = [
+  // "I like X"
+  /(?:i like|i love|mujhe pasand hai|mera favorite hai|mere.*pasand)\s+(.+)/i,
+  // "I want to X"
+  /(?:i want to|i am planning to|mera plan hai|maine socha hai)\s+(.+)/i,
+  // "I am from X"
+  /(?:i am from|i come from|main from|mera origin)\s+(.+)/i,
+  // "I am working on X"
+  /(?:i am working on|i have a|mera|bana raha hu|bana rahi hu)\s+(?:project|website|app|business|startup)\s+(?:hai|hoon|:|)?\s*(.+)/i
+];
+
+function extractImportantFacts(message) {
+  const facts = [];
+  
+  for (const pattern of FACT_PATTERNS) {
+    const match = message.match(pattern);
+    if (match && match[1]) {
+      facts.push(match[1].trim());
+    }
+  }
+  
+  for (const fact of facts) {
+    // Check if already exists
+    const exists = memory.importantFacts.some(f => f.fact.toLowerCase().includes(fact.toLowerCase()));
+    if (!exists && fact.length > 3 && fact.length < 200) {
+      memory.importantFacts.push({
+        fact: fact,
+        timestamp: Date.now(),
+        source: 'conversation'
+      });
+      
+      // Keep only last 20 facts
+      if (memory.importantFacts.length > 20) {
+        memory.importantFacts = memory.importantFacts.slice(-20);
+      }
+    }
+  }
+  
+  if (facts.length > 0) {
+    saveMemory();
+  }
+}
+
+/* ═══════════════════════════════════════
+   HELPER FUNCTIONS
+══════════════════════════════════════ */
+
+function getTimeAgo(timestamp) {
+  const diff = Date.now() - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  
+  if (minutes < 1) return 'abhi';
+  if (minutes < 60) return minutes + ' min ago';
+  if (hours < 24) return hours + ' ghante pehle';
+  if (days === 1) return 'kal';
+  if (days < 7) return days + ' din pehle';
+  if (days < 30) return Math.floor(days / 7) + ' hafte pehle';
+  return Math.floor(days / 30) + ' mahine pehle';
+}
+
+function updateMemorySummary() {
+  const el = document.getElementById('memoryTopicsSummary');
+  if (el) {
+    let summary = '';
+    if (memory.profile.name) {
+      summary += 'Name: ' + memory.profile.name;
+    }
+    if (memory.conversations.length > 0) {
+      const totalMsgs = memory.conversations.reduce((sum, c) => sum + c.messages.length, 0);
+      if (summary) summary += ' • ';
+      summary += totalMsgs + ' messages stored';
+    }
+    if (!summary) summary = 'No memory yet';
+    el.textContent = summary;
+  }
+}
+
+/* ═══════════════════════════════════════
+   PROCESS AFTER USER SENDS MESSAGE
+══════════════════════════════════════ */
+
+// Called immediately when user sends message (BEFORE API call)
+function processUserMessage(userMessage) {
+  // 1. Extract and save user info immediately
+  extractUserInfo(userMessage);
+  
+  // 2. Save to conversation
+  saveUserMessage(userMessage);
+  
+  // 3. Extract important facts
+  extractImportantFacts(userMessage);
+}
+
+// Called after AI response
+function processAfterResponse(userMessage, aiResponse) {
+  // 1. Save AI response
+  saveAssistantMessage(aiResponse);
+  
+  // 2. Save memory
+  saveMemory();
+  
+  // 3. Update summary
+  updateMemorySummary();
+  
+  console.log('Memory saved. Profile:', memory.profile);
+}
+
+/* ═══════════════════════════════════════
+   CLEAR MEMORY
+══════════════════════════════════════ */
+
+function clearMemory() {
+  if (confirm('Clear all memory? Your name and profile will be forgotten. This cannot be undone.')) {
+    memory = JSON.parse(JSON.stringify(DEFAULT_MEMORY));
+    saveMemory();
+    updateMemorySummary();
+    showToast('Memory cleared!');
+  }
+}
+
+// Initialize on load
+initMemory();
+
+console.log('Full Memory System v3.0 loaded!');
+</script>
+<script>
+/* ═══════════════════════════════════════
    PROFILE PANEL
 ══════════════════════════════════════ */
 // Use our backend server for load balancing (10 keys)
 const API_BASE = 'http://localhost:8000';
+
+// ═══════════════════════════════════════
+// AUTH SYSTEM
+// ═══════════════════════════════════════
+async function checkAuth() {
+  const token = localStorage.getItem('saurabh_token');
+  if (!token) return false;
+  
+  try {
+    const res = await fetch(API_BASE + '/auth/check-session', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    return data.valid || false;
+  } catch (e) {
+    return false;
+  }
+}
+
+function logout() {
+  localStorage.removeItem('saurabh_token');
+  localStorage.removeItem('saurabh_email');
+  window.location.href = '/auth/login-page';
+}
 
 const MODELS = [
   { id:'auto',                                           api:'groq', name:'⚡ Auto Best',        color:'#d4845a', desc:'Query ke hisaab se best model auto-select' },
@@ -889,6 +1440,43 @@ function doClearAll() {
   showToast('All chats deleted!');
 }
 
+function viewChatHistory() {
+  closeProfile();
+  const list = document.getElementById('chatHistoryList');
+  const savedChats = JSON.parse(localStorage.getItem('saurabh_chats') || '[]');
+  
+  if (!savedChats.length) {
+    list.innerHTML = '<div class="chat-history-empty">No chat history found</div>';
+  } else {
+    list.innerHTML = savedChats.map((chat, i) => {
+      const firstMsg = chat.messages?.find(m => m.role === 'user')?.content || 'Empty chat';
+      const preview = typeof firstMsg === 'string' ? firstMsg : firstMsg.substring(0, 50);
+      const date = new Date(chat.date).toLocaleString();
+      return `<div class="chat-history-item" onclick="loadChat(${i})">
+        <div class="chi-time">${date}</div>
+        <div class="chi-preview">${preview.substring(0, 80)}...</div>
+      </div>`;
+    }).join('');
+  }
+  
+  document.getElementById('chatHistoryModal').classList.add('show');
+}
+
+function closeChatHistory() {
+  document.getElementById('chatHistoryModal').classList.remove('show');
+}
+
+function loadChat(index) {
+  const savedChats = JSON.parse(localStorage.getItem('saurabh_chats') || '[]');
+  if (savedChats[index]) {
+    AppState.chatHistory = savedChats[index].messages || [];
+    AppState.currentChatId = savedChats[index].id;
+    renderChat();
+    closeChatHistory();
+    showToast('Chat loaded!');
+  }
+}
+
 function exportChat() {
   if (!AppState.chatHistory.length) { showToast('No chat to export'); return; }
   closeProfile();
@@ -910,12 +1498,60 @@ function exportChat() {
 }
 
 /* ═══════════════════════════════════════
-   SPLASH
-══════════════════════════════════════ */
-setTimeout(() => {
-  document.getElementById('splash').classList.add('out');
-  setTimeout(() => { document.getElementById('splash').style.display='none'; }, 700);
-}, 2600);
+   SPLASH WITH AUTH CHECK
+ ═══════════════════════════════════════ */
+async function initApp() {
+  const splash = document.getElementById('splash');
+  const spStatus = document.querySelector('.sp-status');
+  
+  // Update status
+  if (spStatus) spStatus.textContent = 'CHECKING SESSION...';
+  
+  // Check authentication
+  const isAuth = await checkAuth();
+  
+  if (!isAuth) {
+    // Not logged in - redirect to login page
+    if (spStatus) spStatus.textContent = 'REDIRECTING TO LOGIN...';
+    setTimeout(() => {
+      window.location.href = '/auth/login-page';
+    }, 1000);
+    return;
+  }
+  
+  // Get user info and update profile
+  const token = localStorage.getItem('saurabh_token');
+  const email = localStorage.getItem('saurabh_email');
+  if (email) {
+    const userName = email.split('@')[0];
+    const userInitial = email.charAt(0).toUpperCase();
+    
+    // Update profile panel
+    const profileName = document.getElementById('profileNameBig');
+    const profileAvatar = document.getElementById('profileAvatarBig');
+    const profileTagline = document.getElementById('profileTagline');
+    if (profileName) profileName.textContent = userName;
+    if (profileAvatar) profileAvatar.textContent = userInitial;
+    if (profileTagline) profileTagline.textContent = email;
+    
+    // Update sidebar footer
+    const sidebarName = document.getElementById('sidebarUserName');
+    const sidebarEmail = document.getElementById('sidebarUserEmail');
+    if (sidebarName) sidebarName.textContent = userName;
+    if (sidebarEmail) sidebarEmail.textContent = email;
+  }
+  
+  // Logged in - show app
+  if (spStatus) spStatus.textContent = 'LOADING APP...';
+  
+  setTimeout(() => {
+    splash.classList.add('out');
+    setTimeout(() => { splash.style.display = 'none'; }, 700);
+  }, 2600);
+}
+
+// Start auth check
+initApp();
 
 /* ═══════════════════════════════════════
    SOUND ENGINE
@@ -1004,6 +1640,18 @@ function saveChat() {
   renderSidebar();
 }
 
+function toggleChats() {
+  const chatsList = document.getElementById('chatsList');
+  const btn = document.getElementById('chatsToggleBtn');
+  if (chatsList.classList.contains('open')) {
+    chatsList.classList.remove('open');
+    btn.style.transform = 'rotate(0deg)';
+  } else {
+    chatsList.classList.add('open');
+    btn.style.transform = 'rotate(180deg)';
+  }
+}
+
 function renderSidebar() {
   const all = loadC();
   const keys = Object.keys(all).sort((a,b)=>all[b].ts-all[a].ts);
@@ -1014,6 +1662,9 @@ function renderSidebar() {
       <svg class="chat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
       <div class="chat-title">${escHtml(all[id].title)}</div>
     </div>`).join('');
+  // Add open class to show chats by default
+  el.classList.add('open');
+  document.getElementById('chatsToggleBtn').style.transform = 'rotate(180deg)';
   el.querySelectorAll('.chat-item').forEach(item => {
     let pt;
     item.addEventListener('touchstart', e=>{pt=setTimeout(()=>showDelPopup(e,item.dataset.id),500)}, {passive:true});
@@ -1030,7 +1681,12 @@ function loadChat(id) {
   const msgs = document.getElementById('msgs');
   msgs.style.display='block'; msgs.innerHTML=c.html||'';
   document.getElementById('chatArea').scrollTop=99999;
-  closeSidebar(); renderSidebar();
+  renderSidebar();
+  // Keep chat list open after loading chat
+  const chatsList = document.getElementById('chatsList');
+  const btn = document.getElementById('chatsToggleBtn');
+  chatsList.classList.add('open');
+  btn.style.transform = 'rotate(180deg)';
   setTimeout(()=>document.getElementById('msgInput').focus(),200);
 }
 
@@ -1039,11 +1695,28 @@ function delChat(id) {
   if (AppState.chatId===id) newChat(); else renderSidebar();
 }
 
+function toggleChats() {
+  const chatsList = document.getElementById('chatsList');
+  const btn = document.getElementById('chatsToggleBtn');
+  if (chatsList.classList.contains('open')) {
+    chatsList.classList.remove('open');
+    btn.style.transform = 'rotate(0deg)';
+  } else {
+    chatsList.classList.add('open');
+    btn.style.transform = 'rotate(180deg)';
+  }
+}
+
 function newChat() {
   AppState.chatId='c'+Date.now(); AppState.chatHistory=[];
   document.getElementById('welcomeScreen').style.display='flex';
   const msgs=document.getElementById('msgs'); msgs.style.display='none'; msgs.innerHTML='';
-  removeImg(); closeSidebar(); renderSidebar();
+  removeImg(); renderSidebar();
+  // Keep chat list open after new chat
+  const chatsList = document.getElementById('chatsList');
+  const btn = document.getElementById('chatsToggleBtn');
+  chatsList.classList.add('open');
+  btn.style.transform = 'rotate(180deg)';
 }
 
 /* ═══════════════════════════════════════
@@ -1089,10 +1762,14 @@ async function send() {
 
   if (AppState.pendingImg) {
     const img=AppState.pendingImg, q=txt||'Is image mein kya hai? Detail mein batao.';
-    addUserMsg(txt,img); AppState.chatHistory.push({role:'user',content:q}); removeImg();
+    addUserMsg(txt,img); 
+    processUserMessage(q); // Save to memory BEFORE API call
+    AppState.chatHistory.push({role:'user',content:q}); removeImg();
     await stream(true,img,q);
   } else {
-    addUserMsg(txt); extractUserInfo(txt); AppState.chatHistory.push({role:'user',content:txt});
+    addUserMsg(txt); 
+    processUserMessage(txt); // Save to memory BEFORE API call (extracts name, saves conversation, etc.)
+    AppState.chatHistory.push({role:'user',content:txt});
     await stream(false,null,txt);
   }
 }
@@ -1160,7 +1837,7 @@ async function stream(isImg, imgSrc, userTxt) {
   sb.classList.add('loading'); sb.disabled=true;
 
   const {target, msgId} = addAIRow();
-  const sys = (AppState.activeMode ? MODES[AppState.activeMode].system : BASE_SYS) + getMemoryContext(txt);
+  const sys = (AppState.activeMode ? MODES[AppState.activeMode].system : BASE_SYS) + getMemoryContext(userTxt);
   const msgs = [{role:'system',content:sys}, ...AppState.chatHistory.slice(-14,-1)];
 
   if (isImg) msgs.push({role:'user',content:[{type:'image_url',image_url:{url:imgSrc}},{type:'text',text:userTxt}]});
@@ -1171,14 +1848,25 @@ async function stream(isImg, imgSrc, userTxt) {
   if (isImg) useModel='meta-llama/llama-4-maverick-17b-128e-instruct';
 
   let full='', tickCount=0;
+  const token = localStorage.getItem('saurabh_token');
+  
   try {
     // Use our backend server for load balancing (10 keys)
     const res=await fetch(API_BASE+'/chat',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization': 'Bearer ' + (token || '')
+      },
       body:JSON.stringify({model:useModel,messages:msgs,stream:true,max_tokens:2000,temperature:.75})
     });
 
+    if (res.status === 401) {
+      // Not authenticated - redirect to login
+      logout();
+      return;
+    }
+    
     if (!res.ok) {
       const e=await res.json().catch(()=>({}));
       target.innerHTML='<span style="color:#ef4444">⚠️ '+(e.error?.message||res.statusText)+'</span>';
@@ -1204,7 +1892,7 @@ async function stream(isImg, imgSrc, userTxt) {
       }
       target.innerHTML=renderMsg(full)||'...';
       AppState.chatHistory.push({role:'assistant',content:full});
-      saveChat(); processAfterResponse(userTxt);
+      saveChat(); processAfterResponse(userTxt, full);
     }
   } catch(e) {
     if (!navigator.onLine) target.innerHTML='<span style="color:#f59e0b">⚡ Offline — koi response nahi mil sakta</span>';
@@ -1350,6 +2038,12 @@ function onKey(e) { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}
 ═══════════════════════════════════════ */
 function openSidebar()  { document.getElementById('sidebar').classList.add('open'); document.getElementById('mobOverlay').classList.add('show'); }
 function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('mobOverlay').classList.remove('show'); }
+function toggleSidebar() { 
+  const sidebar = document.getElementById('sidebar');
+  const main = document.querySelector('.main');
+  sidebar.classList.toggle('closed');
+  if (main) main.classList.toggle('full-width');
+}
 
 /* ═══════════════════════════════════════
    OFFLINE DETECTION
@@ -1410,6 +2104,5 @@ document.getElementById('pillLabel').textContent = AppState.selModel.name;
 document.getElementById('pillDot').style.background = AppState.selModel.color;
 document.getElementById('themeToggle').classList.add('on');
 </script>
-  <script src="memory_system.js"></script>
 </body>
 </html>

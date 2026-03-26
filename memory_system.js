@@ -57,7 +57,7 @@ function isImportantQuery(query) {
     if (q.includes(keyword)) return true;
   }
   if (query.length > 50) return true;
-  if (/(how|what|why|explain|tell me|describe|help|make|create|build|write|code)/i.test(q)) return true;
+  if (/\b(how|what|why|explain|tell me|describe|help|make|create|build|write|code)\b/i.test(q)) return true;
   return false;
 }
 
@@ -100,10 +100,7 @@ function getRecallContext(query) {
   let context = '';
   const topics = [...memory.importantTopics].sort((a, b) => b.timestamp - a.timestamp);
   if (topics.length === 0) return '';
-  context = '
-
-===== PREVIOUS IMPORTANT TOPICS =====
-';
+  context = '\n\n===== PREVIOUS IMPORTANT TOPICS =====\n';
   const recentTopics = topics.slice(0, 5);
   recentTopics.forEach((t, i) => {
     const timeAgo = getTimeAgo(t.timestamp);
@@ -113,10 +110,7 @@ function getRecallContext(query) {
   if (/subah|morning/i.test(q)) {
     const morningTopics = topics.filter(t => { const hour = new Date(t.timestamp).getHours(); return hour >= 5 && hour < 12; });
     if (morningTopics.length > 0) {
-      context = '
-
-===== MORNING TOPICS =====
-';
+      context = '\n\n===== MORNING TOPICS =====\n';
       morningTopics.forEach((t, i) => { context += `${i + 1}. ${t.topic}
 `; });
     }
@@ -124,16 +118,12 @@ function getRecallContext(query) {
   if (/raat|night|evening/i.test(q)) {
     const nightTopics = topics.filter(t => { const hour = new Date(t.timestamp).getHours(); return hour >= 18 && hour < 24; });
     if (nightTopics.length > 0) {
-      context = '
-
-===== EVENING TOPICS =====
-';
+      context = '\n\n===== EVENING TOPICS =====\n';
       nightTopics.forEach((t, i) => { context += `${i + 1}. ${t.topic}
 `; });
     }
   }
-  context += '===== END PREVIOUS TOPICS =====
-';
+  context += '===== END PREVIOUS TOPICS =====\n';
   return context;
 }
 
@@ -173,16 +163,12 @@ function getMemoryContext(query) {
   let context = '';
   if (isRecallQuery(query)) context += getRecallContext(query);
   if (memory.profile.name || memory.profile.occupation) {
-    context += '
-
-===== USER PROFILE =====
-';
+    context += '\n\n===== USER PROFILE =====\n';
     if (memory.profile.name) context += `Name: ${memory.profile.name}
 `;
     if (memory.profile.occupation) context += `Occupation: ${memory.profile.occupation}
 `;
-    context += '===== END USER PROFILE =====
-';
+    context += '===== END USER PROFILE =====\n';
   }
   return context;
 }

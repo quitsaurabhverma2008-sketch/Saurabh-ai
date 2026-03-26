@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Saurabh AI - Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
+    <style>
+        :root {
+            --bg: #06060a;
+            --bg2: #0a0a12;
+            --a: #d4845a;
+            --a2: #f0a060;
+            --a3: #f5c080;
+            --a4: #ffd700;
+            --text: #f0ede8;
+            --text2: #a09890;
+            --success: #22c55e;
+            --error: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .login-overlay {
+            position: relative;
+            z-index: 10;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .logo-3d-container {
+            width: 200px;
+            height: 200px;
+            margin-bottom: 40px;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .logo-3d-container:hover {
+            transform: scale(1.05);
+        }
+
+        .login-card {
+            background: rgba(10, 10, 18, 0.95);
+            border: 1px solid rgba(212, 132, 90, 0.3);
+            border-radius: 24px;
+            padding: 40px;
+            width: 100%;
+            max-width: 420px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 0 80px rgba(212, 132, 90, 0.15);
+        }
+
+        .login-title {
+            font-family: 'Cinzel', serif;
+            font-size: 32px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--a), var(--a2), var(--a3));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .login-subtitle {
+            text-align: center;
+            color: var(--text2);
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-label {
+            display: block;
+            font-size: 14px;
+            color: var(--text2);
+            margin-bottom: 8px;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 16px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(212, 132, 90, 0.2);
+            border-radius: 14px;
+            color: var(--text);
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--a);
+            box-shadow: 0 0 30px rgba(212, 132, 90, 0.3);
+        }
+
+        .input-field::placeholder {
+            color: var(--text2);
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 18px 24px;
+            background: linear-gradient(135deg, var(--a), var(--a2));
+            border: none;
+            border-radius: 14px;
+            color: var(--bg);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(212, 132, 90, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(-1px);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            width: 100%;
+            padding: 14px 24px;
+            background: transparent;
+            border: 2px solid rgba(212, 132, 90, 0.3);
+            border-radius: 14px;
+            color: var(--a);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(212, 132, 90, 0.1);
+            border-color: var(--a);
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            padding: 14px 18px;
+            color: var(--error);
+            font-size: 14px;
+            margin-bottom: 20px;
+            display: none;
+            animation: shake 0.5s ease;
+        }
+
+        .error-message.active {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .success-message {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 12px;
+            padding: 14px 18px;
+            color: var(--success);
+            font-size: 14px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .success-message.active {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .loading-spinner {
+            display: none;
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto;
+        }
+
+        .btn-primary.loading .btn-text { display: none; }
+        .btn-primary.loading .loading-spinner { display: block; }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .welcome-screen {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .welcome-icon {
+            font-size: 100px;
+            margin-bottom: 20px;
+            animation: bounce 1s ease infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .welcome-title {
+            font-family: 'Cinzel', serif;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, var(--a), var(--a2), var(--a3));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .welcome-message {
+            color: var(--text2);
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--a);
+            border-radius: 50%;
+            opacity: 0.6;
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.6; }
+            50% { transform: translateY(-100px) rotate(180deg); opacity: 0.2; }
+        }
+
+        .click-hint {
+            text-align: center;
+            margin-top: 20px;
+            color: var(--text2);
+            font-size: 14px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .toggle-text {
+            text-align: center;
+            margin-top: 20px;
+            color: var(--text2);
+            font-size: 14px;
+        }
+
+        .toggle-text a {
+            color: var(--a);
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .toggle-text a:hover {
+            text-decoration: underline;
+        }
+
+        .password-toggle {
+            position: relative;
+        }
+
+        .password-toggle .toggle-btn {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text2);
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 30px 24px;
+                margin: 10px;
+                border-radius: 20px;
+            }
+            
+            .logo-3d-container {
+                width: 160px;
+                height: 160px;
+            }
+            
+            .login-title {
+                font-size: 26px;
+            }
+        }
+
+        /* OTP Input Styles */
+        .otp-box {
+            width: 48px;
+            height: 56px;
+            text-align: center;
+            font-size: 28px;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(212, 132, 90, 0.3);
+            border-radius: 12px;
+            color: var(--text);
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .otp-box:focus {
+            border-color: var(--a);
+            box-shadow: 0 0 20px rgba(212, 132, 90, 0.4);
+        }
+
+        .otp-box::placeholder {
+            color: var(--text2);
+        }
+    </style>
+</head>
+<body>
+    <!-- 3D Canvas -->
+    <div id="canvas-container"></div>
+
+    <!-- Floating Particles -->
+    <div class="particles" id="particles"></div>
+
+    <!-- Login Overlay -->
+    <div class="login-overlay">
+        <!-- Logo 3D Container -->
+        <div class="logo-3d-container" id="logoContainer" onclick="showLoginForm()">
+            <div id="logo3d"></div>
+        </div>
+
+        <!-- Click Hint -->
+        <p class="click-hint" id="clickHint">Tap logo to start</p>
+
+        <!-- Login Card -->
+        <div class="login-card" id="loginCard">
+            <h1 class="login-title">Saurabh AI</h1>
+            <p class="login-subtitle" id="loginSubtitle">Sign in with Email OTP</p>
+
+            <!-- Error/Success Messages -->
+            <div class="error-message" id="errorMessage">
+                <span>&#9888;</span>
+                <span id="errorText"></span>
+            </div>
+            <div class="success-message" id="successMessage">
+                <span>&#10004;</span>
+                <span id="successText"></span>
+            </div>
+
+            <!-- Screen 1: Login Form -->
+            <div class="screen active" id="loginScreen">
+                <div class="input-group">
+                    <label class="input-label">&#128231; Email</label>
+                    <input type="email" class="input-field" id="emailInput" placeholder="your.email@gmail.com">
+                </div>
+                
+                <button class="btn-primary" id="loginBtn" onclick="login()">
+                    <span class="btn-text">Send OTP</span>
+                    <div class="loading-spinner"></div>
+                </button>
+
+                <button class="btn-secondary" id="registerBtn" onclick="showRegisterScreen()">
+                    Create New Account
+                </button>
+            </div>
+
+            <!-- Screen 2: Register Form -->
+            <div class="screen" id="registerScreen">
+                <div class="input-group">
+                    <label class="input-label">&#128231; Email</label>
+                    <input type="email" class="input-field" id="regEmailInput" placeholder="your.email@gmail.com">
+                </div>
+                
+                <button class="btn-primary" id="registerUserBtn" onclick="register()">
+                    <span class="btn-text">Send OTP</span>
+                    <div class="loading-spinner"></div>
+                </button>
+                
+                <button class="btn-secondary" id="loginBtn2" onclick="showLoginScreen()">
+                    Already have an account? Login
+                </button>
+            </div>
+
+            <!-- Screen 3: Success -->
+            <div class="welcome-screen" id="successScreen">
+                <div class="welcome-icon">&#127881;</div>
+                <h1 class="welcome-title" id="successTitle">Welcome!</h1>
+                <p class="welcome-message" id="successMessageText">Loading Saurabh AI...</p>
+            </div>
+
+            <!-- Screen 4: OTP Login -->
+            <div class="screen" id="otpScreen">
+                <p style="text-align: center; color: var(--text2); margin-bottom: 20px;">
+                    OTP sent to <span id="otpEmailDisplay" style="color: var(--a);"></span>
+                </p>
+                
+                <div class="otp-inputs" style="display: flex; gap: 8px; justify-content: center; margin-bottom: 20px;">
+                    <input type="text" class="otp-box" maxlength="1" id="otp1" oninput="moveToNext(this, 'otp2')" onkeyup="moveToPrev(event, this, 'otp1')">
+                    <input type="text" class="otp-box" maxlength="1" id="otp2" oninput="moveToNext(this, 'otp3')" onkeyup="moveToPrev(event, this, 'otp1')">
+                    <input type="text" class="otp-box" maxlength="1" id="otp3" oninput="moveToNext(this, 'otp4')" onkeyup="moveToPrev(event, this, 'otp2')">
+                    <input type="text" class="otp-box" maxlength="1" id="otp4" oninput="moveToNext(this, 'otp5')" onkeyup="moveToPrev(event, this, 'otp3')">
+                    <input type="text" class="otp-box" maxlength="1" id="otp5" oninput="moveToNext(this, 'otp6')" onkeyup="moveToPrev(event, this, 'otp4')">
+                    <input type="text" class="otp-box" maxlength="1" id="otp6" oninput="moveToNext(this, '')" onkeyup="moveToPrev(event, this, 'otp5')">
+                </div>
+                
+                <button class="btn-primary" id="verifyOtpBtn" onclick="verifyOtp()">
+                    <span class="btn-text">Verify & Login</span>
+                    <div class="loading-spinner"></div>
+                </button>
+                
+                <button class="btn-secondary" id="resendOtpBtn" onclick="resendOtp()">
+                    Resend OTP
+                </button>
+                
+                <button class="btn-secondary" onclick="showLoginScreen()">
+                    &#8592; Use different email
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============== CONFIGURATION ==============
+        const API_BASE = 'http://localhost:8000';
+        
+        // ============== STATE ==============
+        let scene, camera, renderer, logoMesh, particles = [];
+
+        // ============== 3D SCENE ==============
+        function init3DScene() {
+            const container = document.getElementById('logo3d');
+            const width = container.clientWidth || 200;
+            const height = container.clientHeight || 200;
+
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+            camera.position.z = 30;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(width, height);
+            renderer.setClearColor(0x000000, 0);
+            container.appendChild(renderer.domElement);
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+
+            const pointLight = new THREE.PointLight(0xd4845a, 2, 100);
+            pointLight.position.set(20, 20, 20);
+            scene.add(pointLight);
+
+            const pointLight2 = new THREE.PointLight(0xf0a060, 1.5, 100);
+            pointLight2.position.set(-20, -20, 20);
+            scene.add(pointLight2);
+
+            // Logo
+            const logoGeometry = new THREE.ConeGeometry(12, 20, 3);
+            const logoMaterial = new THREE.MeshPhongMaterial({
+                color: 0xd4845a,
+                emissive: 0x8B4513,
+                specular: 0xffffff,
+                shininess: 100,
+                flatShading: true
+            });
+            logoMesh = new THREE.Mesh(logoGeometry, logoMaterial);
+            logoMesh.rotation.x = Math.PI;
+            scene.add(logoMesh);
+
+            // Glow
+            const glowGeometry = new THREE.ConeGeometry(12.5, 20.5, 3);
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: 0xf0a060,
+                transparent: true,
+                opacity: 0.2,
+                side: THREE.BackSide
+            });
+            const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+            glowMesh.rotation.x = Math.PI;
+            scene.add(glowMesh);
+
+            createParticles();
+            animate();
+        }
+
+        function createParticles() {
+            const particleCount = 50;
+            const geometry = new THREE.SphereGeometry(0.3, 8, 8);
+            
+            for (let i = 0; i < particleCount; i++) {
+                const material = new THREE.MeshBasicMaterial({
+                    color: Math.random() > 0.5 ? 0xd4845a : 0xf0a060,
+                    transparent: true,
+                    opacity: 0.6
+                });
+                
+                const particle = new THREE.Mesh(geometry, material);
+                particle.position.x = (Math.random() - 0.5) * 60;
+                particle.position.y = (Math.random() - 0.5) * 60;
+                particle.position.z = (Math.random() - 0.5) * 40;
+                
+                particle.userData = {
+                    speedX: (Math.random() - 0.5) * 0.02,
+                    speedY: (Math.random() - 0.5) * 0.02,
+                    speedZ: (Math.random() - 0.5) * 0.02
+                };
+                
+                scene.add(particle);
+                particles.push(particle);
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (logoMesh) {
+                logoMesh.rotation.y += 0.01;
+                logoMesh.rotation.x = Math.PI + Math.sin(Date.now() * 0.001) * 0.1;
+            }
+
+            particles.forEach(particle => {
+                particle.position.x += particle.userData.speedX;
+                particle.position.y += particle.userData.speedY;
+                particle.position.z += particle.userData.speedZ;
+
+                if (Math.abs(particle.position.x) > 30) particle.userData.speedX *= -1;
+                if (Math.abs(particle.position.y) > 30) particle.userData.speedY *= -1;
+                if (Math.abs(particle.position.z) > 20) particle.userData.speedZ *= -1;
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        // ============== PARTICLES BACKGROUND ==============
+        function createFloatingParticles() {
+            const container = document.getElementById('particles');
+            const count = 25;
+            
+            for (let i = 0; i < count; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.top = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 6 + 's';
+                particle.style.animationDuration = (4 + Math.random() * 4) + 's';
+                container.appendChild(particle);
+            }
+        }
+
+        // ============== UI FUNCTIONS ==============
+        function showLoginForm() {
+            document.getElementById('clickHint').style.display = 'none';
+        }
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            hideMessages();
+        }
+
+        function showLoginScreen() {
+            showScreen('loginScreen');
+            document.getElementById('loginSubtitle').textContent = 'Sign in with Email OTP';
+        }
+
+        function showRegisterScreen() {
+            showScreen('registerScreen');
+            document.getElementById('loginSubtitle').textContent = 'Create New Account';
+        }
+
+        function showOtpScreen() {
+            showScreen('otpScreen');
+            document.getElementById('loginSubtitle').textContent = 'Verify OTP';
+        }
+
+        function showError(message) {
+            document.getElementById('errorText').textContent = message;
+            document.getElementById('errorMessage').classList.add('active');
+            document.getElementById('successMessage').classList.remove('active');
+        }
+
+        function showSuccess(message) {
+            document.getElementById('successText').textContent = message;
+            document.getElementById('successMessage').classList.add('active');
+            document.getElementById('errorMessage').classList.remove('active');
+        }
+
+        function hideMessages() {
+            document.getElementById('errorMessage').classList.remove('active');
+            document.getElementById('successMessage').classList.remove('active');
+        }
+
+        function setLoading(btnId, loading) {
+            const btn = document.getElementById(btnId);
+            if (loading) {
+                btn.classList.add('loading');
+                btn.disabled = true;
+            } else {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+            }
+        }
+
+        function togglePassword() {
+            const input = document.getElementById('passwordInput');
+            const btn = input.nextElementSibling;
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = 'Hide';
+            } else {
+                input.type = 'password';
+                btn.textContent = 'Show';
+            }
+        }
+
+        function toggleRegPassword() {
+            const input = document.getElementById('regPasswordInput');
+            const btn = input.nextElementSibling;
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = 'Hide';
+            } else {
+                input.type = 'password';
+                btn.textContent = 'Show';
+            }
+        }
+
+        function toggleRegConfirmPassword() {
+            const input = document.getElementById('regConfirmPasswordInput');
+            const btn = input.nextElementSibling;
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = 'Hide';
+            } else {
+                input.type = 'password';
+                btn.textContent = 'Show';
+            }
+        }
+
+        // ============== API FUNCTIONS ==============
+        let currentOtpEmail = '';
+
+        async function login() {
+            const email = document.getElementById('emailInput').value.trim().toLowerCase();
+            
+            if (!email || !email.includes('@')) {
+                showError('Please enter a valid email address');
+                return;
+            }
+            
+            // Send OTP instead of password login
+            setLoading('loginBtn', true);
+            hideMessages();
+            
+            try {
+                const response = await fetch(API_BASE + '/auth/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    showError(data.detail || data.message || 'Failed to send OTP');
+                    setLoading('loginBtn', false);
+                    return;
+                }
+                
+                // Show OTP screen
+                currentOtpEmail = email;
+                document.getElementById('otpEmailDisplay').textContent = email;
+                showOtpScreen();
+                setLoading('loginBtn', false);
+                
+                // Focus first OTP box
+                setTimeout(() => document.getElementById('otp1').focus(), 100);
+                
+            } catch (error) {
+                showError('Failed to send OTP. Please check your internet connection.');
+                console.error('OTP Send Error:', error);
+                setLoading('loginBtn', false);
+            }
+        }
+
+        function moveToNext(current, nextId) {
+            if (current.value.length === 1 && nextId) {
+                document.getElementById(nextId).focus();
+            }
+        }
+
+        function moveToPrev(event, current, prevId) {
+            if (event.key === 'Backspace' && current.value.length === 0 && prevId) {
+                document.getElementById(prevId).focus();
+            }
+        }
+
+        async function verifyOtp() {
+            const otp = 
+                document.getElementById('otp1').value +
+                document.getElementById('otp2').value +
+                document.getElementById('otp3').value +
+                document.getElementById('otp4').value +
+                document.getElementById('otp5').value +
+                document.getElementById('otp6').value;
+            
+            if (otp.length !== 6) {
+                showError('Please enter complete 6-digit OTP');
+                return;
+            }
+            
+            setLoading('verifyOtpBtn', true);
+            hideMessages();
+            
+            try {
+                const response = await fetch(API_BASE + '/auth/verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: currentOtpEmail, otp: otp })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    showError(data.detail || data.message || 'Invalid OTP');
+                    setLoading('verifyOtpBtn', false);
+                    return;
+                }
+                
+                // Success!
+                handleLoginSuccess(data);
+                
+            } catch (error) {
+                showError('Verification failed. Please try again.');
+                console.error('OTP Verify Error:', error);
+                setLoading('verifyOtpBtn', false);
+            }
+        }
+
+        async function resendOtp() {
+            if (!currentOtpEmail) return;
+            
+            setLoading('resendOtpBtn', true);
+            
+            try {
+                const response = await fetch(API_BASE + '/auth/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: currentOtpEmail })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showSuccess('OTP resent! Check your inbox.');
+                } else {
+                    showError(data.detail || 'Failed to resend OTP');
+                }
+                
+            } catch (error) {
+                showError('Failed to resend OTP');
+            }
+            
+            setLoading('resendOtpBtn', false);
+        }
+
+        function handleLoginSuccess(data) {
+            // Save token and email
+            localStorage.setItem('saurabh_token', data.token);
+            localStorage.setItem('saurabh_email', data.email);
+            
+            // Show success and redirect
+            document.getElementById('successTitle').textContent = 'Welcome!';
+            document.getElementById('successMessageText').textContent = 'Loading Saurabh AI...';
+            showScreen('successScreen');
+            
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1500);
+        }
+
+        async function register() {
+            const email = document.getElementById('regEmailInput').value.trim().toLowerCase();
+            
+            if (!email || !email.includes('@')) {
+                showError('Please enter a valid email address');
+                return;
+            }
+            
+            // For registration, we'll also use OTP - just send OTP to the email
+            setLoading('registerUserBtn', true);
+            hideMessages();
+            
+            try {
+                const response = await fetch(API_BASE + '/auth/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    showError(data.detail || data.message || 'Failed to send OTP');
+                    setLoading('registerUserBtn', false);
+                    return;
+                }
+                
+                // Show OTP screen for registration verification
+                currentOtpEmail = email;
+                document.getElementById('otpEmailDisplay').textContent = email;
+                showOtpScreen();
+                setLoading('registerUserBtn', false);
+                
+                // Focus first OTP box
+                setTimeout(() => document.getElementById('otp1').focus(), 100);
+                
+            } catch (error) {
+                showError('Failed to send OTP. Please try again.');
+                console.error('Register OTP Error:', error);
+                setLoading('registerUserBtn', false);
+            }
+        }
+
+        async function loginWithCredentials(email, password) {
+            try {
+                const response = await fetch(API_BASE + '/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email, password: password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    handleLoginSuccess(data);
+                }
+                
+            } catch (error) {
+                console.error('Auto login error:', error);
+            }
+        }
+
+        // ============== INITIALIZATION ==============
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check if already logged in
+            const token = localStorage.getItem('saurabh_token');
+            if (token) {
+                window.location.href = '/';
+                return;
+            }
+
+            init3DScene();
+            createFloatingParticles();
+            
+            // Allow Enter key to submit
+            document.getElementById('emailInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') login();
+            });
+            
+            // OTP box Enter key support
+            for (let i = 1; i <= 6; i++) {
+                document.getElementById('otp' + i).addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') verifyOtp();
+                });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 """
-Saurabh AI Backend - FastAPI Server with Load Balancer
+Saurabh AI Backend - FastAPI Server with Load Balancer + Auth System
 Handles multiple API keys for unlimited users
 """
 
@@ -7,15 +7,104 @@ import asyncio
 import json
 import os
 import random
+import sqlite3
+import hashlib
+from datetime import datetime, timedelta
 from typing import Optional, List
 from urllib.parse import quote
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import httpx
 
-# Configuration
+# ============== AUTH CONFIGURATION ==============
+AUTH_CONFIG = {
+    "jwt_secret": "saurabh-ai-secret-key-2026-very-secure",
+    "token_expiry_days": 365,  # Forever until logout
+    "min_password_length": 6,
+}
+
+# ============== DATABASE SETUP ==============
+DB_PATH = os.path.join(os.path.dirname(__file__), "..", "users.db")
+
+def init_database():
+    """Initialize SQLite database for users"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Users table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            gmail TEXT PRIMARY KEY,
+            password_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP,
+            login_count INTEGER DEFAULT 0
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+    print("[AUTH] Database initialized with users table!")
+
+def hash_password(password: str) -> str:
+    """Hash password using SHA-256 with salt"""
+    salt = "saurabh_ai_salt_2026"
+    return hashlib.sha256((password + salt).encode()).hexdigest()
+
+def verify_password(password: str, password_hash: str) -> bool:
+    """Verify password against hash"""
+    return hash_password(password) == password_hash
+
+def create_jwt_token(email: str) -> str:
+    """Create a simple JWT-like token"""
+    import base64
+    import json as json_mod
+    
+    header = base64.urlsafe_b64encode(json_mod.dumps({"alg": "HS256", "typ": "JWT"}).encode()).decode()
+    payload = base64.urlsafe_b64encode(json_mod.dumps({
+        "email": email,
+        "exp": (datetime.now() + timedelta(days=AUTH_CONFIG["token_expiry_days"])).isoformat(),
+        "iat": datetime.now().isoformat()
+    }).encode()).decode()
+    
+    signature = hashlib.sha256((header + "." + payload + AUTH_CONFIG["jwt_secret"]).encode()).hexdigest()
+    return f"{header}.{payload}.{signature}"
+
+def verify_jwt_token(token: str) -> Optional[str]:
+    """Verify JWT token and return email if valid"""
+    try:
+        import base64
+        import json as json_mod
+        
+        parts = token.split(".")
+        if len(parts) != 3:
+            return None
+        
+        header, payload, signature = parts
+        
+        # Verify signature
+        expected_sig = hashlib.sha256((header + "." + payload + AUTH_CONFIG["jwt_secret"]).encode()).hexdigest()
+        if signature != expected_sig:
+            return None
+        
+        # Decode payload
+        payload_data = json_mod.loads(base64.urlsafe_b64decode(payload + "=="))
+        
+        # Check expiry
+        exp = datetime.fromisoformat(payload_data["exp"])
+        if datetime.now() > exp:
+            return None
+        
+        return payload_data["email"]
+    except:
+        return None
+
+# Initialize database on import
+init_database()
+
+# ============== CONFIGURATION ==============
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "api_keys.json")
 
 app = FastAPI(title="Saurabh AI Backend", version="1.0.0")
@@ -41,7 +130,13 @@ def load_config() -> dict:
 
 config = load_config()
 GROQ_KEYS = config.get("groq_keys", [])
-POLLINATIONS_KEYS = config.get("pollinations_keys", [])
+POLLINATIONS_KEYS = config.get("pollinations_keys", [
+    "sk_QZEKTfnghsiUTNH5wVZ4uL7bYZmzsRAu",
+    "sk_FBPT5me4vwsZJSVpATIorgC8sPDSvDTo",
+    "sk_ngA7UYkUveZBvAFNilx5jnKxvr6BOW8z",
+    "sk_a82JJY74rP8pP1fwIpB7lkhrCMBHADKE",
+    "sk_m0lXVlnX26OBGAr2TmAztk318osMzaU7",
+])
 OR_KEY = config.get("openrouter_key", "")
 OR_REFERER = config.get("openrouter_referer", "https://saurabh-ai.app")
 OR_TITLE = config.get("openrouter_title", "Saurabh AI")
@@ -337,17 +432,22 @@ async def stream_from_openrouter(api_key: str, model: str, messages: list, strea
         except Exception as e:
             yield f"data: {{\"error\": \"Connection error: {str(e)}\"}}\n\n".encode()
 
+# Static files path
+STATIC_PATH = os.path.join(os.path.dirname(__file__), "..")
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
-    return {
-        "status": "ok",
-        "service": "Saurabh AI Backend",
-        "version": "1.0.0",
-        "groq_keys_count": len([k for k in GROQ_KEYS if k and k != "YOUR_GROQ_API_KEY_1"]),
-        "message": "Saurabh AI backend is running!"
-    }
+    """Serve the frontend"""
+    index_path = os.path.join(STATIC_PATH, "index.html")
+    return FileResponse(index_path)
+
+
+@app.get("/auth/login-page")
+async def login_page():
+    """Serve the login page"""
+    import os
+    login_path = os.path.join(os.path.dirname(__file__), "..", "auth", "login.html")
+    return FileResponse(login_path)
 
 
 @app.get("/health")
@@ -461,6 +561,16 @@ async def chat(request: Request):
     Main chat endpoint with load balancing + behavior system
     Supports both Groq and OpenRouter
     """
+    # Check authentication
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    token = auth_header.replace("Bearer ", "")
+    email = verify_jwt_token(token)
+    if not email:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
     try:
         body = await request.json()
     except:
@@ -578,6 +688,392 @@ async def generate_image_endpoint(prompt: str, width: int = 1024, height: int = 
     }
 
 
+# ============== AUTH ENDPOINTS ==============
+
+@app.post("/auth/login-with-password")
+async def login_with_password(request: Request):
+    """
+    Alternative: Login with email + password (if user already has password)
+    Returns: {success, token, message}
+    """
+    try:
+        body = await request.json()
+        email = body.get("email")
+        password = body.get("password")
+        
+        if not email or not password:
+            raise HTTPException(status_code=400, detail="Email and password required")
+        
+        # Find user
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT password_hash FROM users WHERE gmail = ?", (email,))
+        result = cursor.fetchone()
+        
+        if not result:
+            conn.close()
+            raise HTTPException(status_code=401, detail="User not found. Please use OTP login.")
+        
+        stored_hash = result[0]
+        
+        # Verify password
+        if not verify_password(password, stored_hash):
+            conn.close()
+            raise HTTPException(status_code=401, detail="Incorrect password")
+        
+        # Update login
+        cursor.execute(
+            "UPDATE users SET last_login = ?, login_count = login_count + 1 WHERE gmail = ?",
+            (datetime.now().isoformat(), email)
+        )
+        conn.commit()
+        conn.close()
+        
+        token = create_jwt_token(email)
+        
+        return {
+            "success": True,
+            "message": "Login successful!",
+            "token": token,
+            "email": email
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/auth/register")
+async def register(request: Request):
+    """
+    Step 2: Register new user with password (first time)
+    Sends email to admin automatically
+    """
+    try:
+        body = await request.json()
+        email = body.get("email")
+        password = body.get("password")
+        
+        if not email or not password:
+            raise HTTPException(status_code=400, detail="Email and password required")
+        
+        # Validate password
+        if len(password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        
+        # Hash password
+        password_hash = hash_password(password)
+        
+        # Save to database
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Check if already exists
+        cursor.execute("SELECT gmail FROM users WHERE gmail = ?", (email,))
+        if cursor.fetchone():
+            conn.close()
+            raise HTTPException(status_code=400, detail="User already exists")
+        
+        # Insert new user
+        cursor.execute(
+            "INSERT INTO users (gmail, password_hash, created_at, login_count) VALUES (?, ?, ?, ?)",
+            (email, password_hash, datetime.now().isoformat(), 1)
+        )
+        conn.commit()
+        conn.close()
+        
+        # Create session token
+        token = create_jwt_token(email)
+        
+        return {
+            "success": True,
+            "message": "Registration successful!",
+            "token": token,
+            "email": email
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/auth/login")
+async def login(request: Request):
+    """
+    Step 3: Login with email and password (returning user)
+    """
+    try:
+        body = await request.json()
+        email = body.get("email")
+        password = body.get("password")
+        
+        if not email or not password:
+            raise HTTPException(status_code=400, detail="Email and password required")
+        
+        # Find user in database
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT password_hash FROM users WHERE gmail = ?", (email,))
+        result = cursor.fetchone()
+        
+        if not result:
+            conn.close()
+            raise HTTPException(status_code=401, detail="User not found. Please register first.")
+        
+        stored_hash = result[0]
+        
+        # Verify password
+        if not verify_password(password, stored_hash):
+            conn.close()
+            raise HTTPException(status_code=401, detail="Incorrect password")
+        
+        # Update last login
+        cursor.execute(
+            "UPDATE users SET last_login = ?, login_count = login_count + 1 WHERE gmail = ?",
+            (datetime.now().isoformat(), email)
+        )
+        conn.commit()
+        conn.close()
+        
+        # Create session token
+        token = create_jwt_token(email)
+        
+        return {
+            "success": True,
+            "message": "Login successful!",
+            "token": token,
+            "email": email
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/auth/user-info")
+async def get_user_info(authorization: str = Header(None)):
+    """Get current user info (requires valid token)"""
+    try:
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Authorization required")
+        
+        token = authorization.replace("Bearer ", "")
+        email = verify_jwt_token(token)
+        
+        if not email:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        
+        # Get user info from database
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT gmail, created_at, last_login, login_count FROM users WHERE gmail = ?",
+            (email,)
+        )
+        result = cursor.fetchone()
+        conn.close()
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return {
+            "success": True,
+            "email": result[0],
+            "created_at": result[1],
+            "last_login": result[2],
+            "login_count": result[3]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/auth/logout")
+async def logout(authorization: str = Header(None)):
+    """Logout user (client should delete token)"""
+    return {
+        "success": True,
+        "message": "Logged out successfully"
+    }
+
+
+# ============== OTP LOGIN SYSTEM ==============
+
+# In-memory OTP store: { "email": "otp_code" }
+otp_store = {}
+
+def send_otp_email(recipient_email: str, otp_code: str) -> bool:
+    """Send OTP to user's Gmail using SMTP"""
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    
+    SENDER_EMAIL = "quitsaurabhverma2008@gmail.com"
+    SENDER_PASSWORD = "hvjjxpqfspfcsqkm"
+    
+    message = MIMEMultipart("alternative")
+    message["Subject"] = "🔐 Your Saurabh AI OTP"
+    message["From"] = SENDER_EMAIL
+    message["To"] = recipient_email
+    
+    plain_text = f"Your Saurabh AI OTP is: {otp_code}\nIt is valid for 5 minutes."
+    
+    html_content = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; background: #f4f4f4; padding: 30px;">
+        <div style="max-width: 400px; margin: auto; background: white;
+                    border-radius: 12px; padding: 30px; text-align: center;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+          <h2 style="color: #333;">Your One-Time Password</h2>
+          <p style="color: #666;">Use this OTP to login to Saurabh AI:</p>
+          <div style="font-size: 40px; font-weight: bold; letter-spacing: 8px;
+                      color: #4f46e5; padding: 20px 0;">{otp_code}</div>
+          <p style="color: #999; font-size: 13px;">
+            This OTP is valid for <strong>5 minutes</strong>.<br>
+            Do not share it with anyone.
+          </p>
+        </div>
+      </body>
+    </html>
+    """
+    
+    message.attach(MIMEText(plain_text, "plain"))
+    message.attach(MIMEText(html_content, "html"))
+    
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp_server:
+        smtp_server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        smtp_server.sendmail(SENDER_EMAIL, recipient_email, message.as_string())
+    
+    return True
+
+
+@app.post("/auth/send-otp")
+async def send_otp(request: Request):
+    """Send OTP to user's email"""
+    try:
+        import random
+        
+        body = await request.json()
+        email = body.get("email", "").strip().lower()
+        
+        if not email:
+            raise HTTPException(status_code=400, detail="Email is required")
+        
+        # Validate email format
+        import re
+        pattern = r'^[\w\.-]+@[\w\.-]+\.\w{2,}$'
+        if not re.match(pattern, email):
+            raise HTTPException(status_code=400, detail="Invalid email format")
+        
+        # Generate 6-digit OTP
+        otp_code = str(random.randint(100000, 999999))
+        
+        # Store OTP
+        otp_store[email] = otp_code
+        print(f"[OTP] OTP for {email}: {otp_code}")
+        
+        # Send OTP via email
+        try:
+            send_otp_email(email, otp_code)
+        except Exception as e:
+            print(f"[OTP] Email send error: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to send OTP: {str(e)}")
+        
+        return {"success": True, "message": f"OTP sent to {email}. Check your inbox!"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/auth/verify-otp")
+async def verify_otp(request: Request):
+    """Verify OTP and create/login user"""
+    try:
+        body = await request.json()
+        email = body.get("email", "").strip().lower()
+        entered_otp = body.get("otp", "").strip()
+        
+        if not email or not entered_otp:
+            raise HTTPException(status_code=400, detail="Email and OTP are required")
+        
+        # Check stored OTP
+        stored_otp = otp_store.get(email)
+        if not stored_otp:
+            raise HTTPException(status_code=400, detail="No OTP found. Please request a new OTP")
+        
+        # Verify OTP
+        if entered_otp != stored_otp:
+            raise HTTPException(status_code=401, detail="Incorrect OTP. Try again.")
+        
+        # OTP matched - clear it
+        del otp_store[email]
+        
+        # Create or update user in database
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Check if user exists
+        cursor.execute("SELECT gmail FROM users WHERE gmail = ?", (email,))
+        if not cursor.fetchone():
+            # Create new user (no password for OTP login)
+            cursor.execute(
+                "INSERT INTO users (gmail, password_hash, created_at, login_count) VALUES (?, ?, ?, ?)",
+                (email, "otp_login", datetime.now().isoformat(), 1)
+            )
+        else:
+            # Update login
+            cursor.execute(
+                "UPDATE users SET last_login = ?, login_count = login_count + 1 WHERE gmail = ?",
+                (datetime.now().isoformat(), email)
+            )
+        
+        conn.commit()
+        conn.close()
+        
+        # Create session token
+        token = create_jwt_token(email)
+        
+        return {
+            "success": True,
+            "message": f"Login successful! Welcome, {email}",
+            "token": token,
+            "email": email
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/auth/check-session")
+async def check_session(authorization: str = Header(None)):
+    """Check if session is valid"""
+    try:
+        if not authorization or not authorization.startswith("Bearer "):
+            return {"valid": False}
+        
+        token = authorization.replace("Bearer ", "")
+        email = verify_jwt_token(token)
+        
+        if email:
+            return {"valid": True, "email": email}
+        else:
+            return {"valid": False}
+            
+    except:
+        return {"valid": False}
+
+
+# ============== STARTUP EVENT ==============
+
 # Startup event
 @app.on_event("startup")
 async def startup_event():
@@ -586,20 +1082,20 @@ async def startup_event():
     print(f"[CONFIG] Groq Keys loaded: {len(GROQ_KEYS)}")
     print(f"[CONFIG] Pollinations Keys loaded: {len(POLLINATIONS_KEYS)}")
     print(f"[CONFIG] Rate limit: {RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW} seconds")
+    print(f"[AUTH] Login System: Email + Password (No OTP)")
 
 
-# Serve static files (frontend)
-STATIC_PATH = os.path.join(os.path.dirname(__file__), "..")
-
-@app.get("/")
-async def serve_index():
-    """Serve the frontend"""
-    index_path = os.path.join(STATIC_PATH, "index.html")
-    return FileResponse(index_path)
-
-
-# Mount static files
+# Serve static files
 app.mount("/static", StaticFiles(directory=STATIC_PATH), name="static")
+app.mount("/js", StaticFiles(directory=STATIC_PATH + "/js"), name="js")
+app.mount("/css", StaticFiles(directory=STATIC_PATH + "/css"), name="css")
+
+# Serve memory_system.js from root
+@app.get("/memory_system.js")
+async def serve_memory():
+    """Serve memory system"""
+    path = os.path.join(STATIC_PATH, "memory_system.js")
+    return FileResponse(path)
 
 
 if __name__ == "__main__":
