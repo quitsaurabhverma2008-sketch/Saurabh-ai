@@ -5,6 +5,7 @@ WSGI-compatible wrapper for FastAPI
 
 import sys
 import os
+from pathlib import Path
 
 # Add project directories to path
 project_root = os.path.dirname(os.path.abspath(__file__))
@@ -19,34 +20,16 @@ if project_root not in sys.path:
 # Change to project directory
 os.chdir(project_root)
 
-# Import the FastAPI app from server.py
-from server import app
+# Import the FastAPI app from backend/server.py
+from backend.server import app
 
-# This is the WSGI callable for PythonAnywhere
-# Using uvicorn's ASGI-to-WSGI bridge
-def get_wsgi_application():
-    """Get WSGI application for PythonAnywhere"""
-    try:
-        # Try using uvicorn if available
-        from uvicorn.main import get_wsgi_server
-        return app
-    except ImportError:
-        return app
+# For PythonAnywhere WSGI, we need to use Starlette's WSGIMiddleware
+from starlette.middleware.wsgi import WSGIMiddleware
 
-# For PythonAnywhere, we'll use the app directly
-# The key is that the variable must be named 'application'
-try:
-    from fastapi import FastAPI
-    from starlette.middleware.wsgi import WSGIMiddleware
-    
-    # Use Starlette's WSGI middleware
-    application = WSGIMiddleware(app)
-except Exception as e:
-    # Fallback - use the app directly
-    print(f"WSGI middleware error: {e}")
-    application = app
+# Create WSGI application
+application = WSGIMiddleware(app)
 
-# Make sure app works
+# For local development (uvicorn)
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
