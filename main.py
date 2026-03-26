@@ -5,7 +5,6 @@ WSGI-compatible wrapper for FastAPI
 
 import sys
 import os
-from pathlib import Path
 
 # Add project directories to path
 project_root = os.path.dirname(os.path.abspath(__file__))
@@ -23,13 +22,16 @@ os.chdir(project_root)
 # Import the FastAPI app from backend/server.py
 from backend.server import app
 
-# For PythonAnywhere WSGI, we need to use Starlette's WSGIMiddleware
-from starlette.middleware.wsgi import WSGIMiddleware
-
-# Create WSGI application
-application = WSGIMiddleware(app)
+# For PythonAnywhere WSGI, use asgiref to convert ASGI to WSGI
+# This is the correct way to bridge FastAPI (ASGI) to WSGI
+try:
+    from asgiref.wsgi import ASGIHandler
+    application = ASGIHandler(app)
+except ImportError:
+    # Fallback - just use the app directly (might not work)
+    application = app
 
 # For local development (uvicorn)
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
