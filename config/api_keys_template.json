@@ -1,0 +1,22 @@
+{
+  "groq_keys": [
+    "YOUR_GROQ_API_KEY_1",
+    "YOUR_GROQ_API_KEY_2",
+    "YOUR_GROQ_API_KEY_3",
+    "YOUR_GROQ_API_KEY_4",
+    "YOUR_GROQ_API_KEY_5",
+    "YOUR_GROQ_API_KEY_6",
+    "YOUR_GROQ_API_KEY_7",
+    "YOUR_GROQ_API_KEY_8",
+    "YOUR_GROQ_API_KEY_9",
+    "YOUR_GROQ_API_KEY_10"
+  ],
+  "pollinations_keys": [
+    "YOUR_POLLINATIONS_KEY_1",
+    "YOUR_POLLINATIONS_KEY_2",
+    "YOUR_POLLINATIONS_KEY_3",
+    "YOUR_POLLINATIONS_KEY_4",
+    "YOUR_POLLINATIONS_KEY_5"
+  ],
+  "default_model": "llama-3.3-70b-versatile"
+}
