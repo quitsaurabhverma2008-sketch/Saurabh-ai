@@ -28,6 +28,7 @@ backend/server.log
 
 # API Keys (NEVER COMMIT!)
 config/api_keys.json
+config/api_keys.json.bak
 
 # Python packages
 .pytest_cache/
