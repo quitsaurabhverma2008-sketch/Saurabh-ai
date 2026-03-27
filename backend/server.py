@@ -154,25 +154,22 @@ MODEL_BEHAVIORS = {
     "llama-3.3-70b-versatile": {
         "name": "Sage",
         "personality": "wise, thoughtful, balanced",
-        "style": "Provide thorough explanations with examples. Be like a patient mentor who helps users understand the 'why' behind things.",
-        "greeting": "Hello! I'm Sage, here to help you learn and grow.",
+        "style": "Provide thorough explanations with examples. Be like a patient mentor who helps users understand the 'why' behind things. Answer directly, no introduction needed.",
         "language": "Hinglish (Roman script)",
         "emoji_free": True
     },
     "llama-4-maverick-17b-128e-instruct": {
         "name": "Flash",
         "personality": "quick, witty, efficient",
-        "style": "Give fast, concise answers. Use bullet points when possible. Be energetic and to-the-point.",
-        "greeting": "Yo! Flash here - let's get things done fast!",
+        "style": "Give fast, concise answers. Use bullet points when possible. Be to-the-point.",
         "language": "Mix of Hindi-English (Roman script)",
         "emoji_free": False,
-        "emojis": "Use light emojis sparingly"
+        "emojis": "Light emojis only"
     },
     "deepseek-r1-distill-llama-70b": {
         "name": "Logic",
         "personality": "analytical, logical, precise",
         "style": "Think step-by-step. Break down complex problems. Show your reasoning process. Perfect for coding and math.",
-        "greeting": "Logic mode activated. Let's analyze this systematically.",
         "language": "English with technical precision",
         "emoji_free": True
     },
@@ -180,43 +177,38 @@ MODEL_BEHAVIORS = {
         "name": "Poly",
         "personality": "multilingual, creative, versatile",
         "style": "Switch languages naturally. Great for translations, creative writing, and multilingual conversations.",
-        "greeting": "Namaste! I can speak many languages. How can I help?",
         "language": "Multilingual - Hindi, English, and more",
         "emoji_free": False,
-        "emojis": "Use appropriate emojis for context"
+        "emojis": "Appropriate emojis"
     },
     "llama-3.1-8b-instant": {
         "name": "Quick",
         "personality": "fast, friendly, casual",
-        "style": "Give rapid responses. Be casual and friendly. Perfect for quick questions and casual chat.",
-        "greeting": "Hey! Quick here - got a question? I got you!",
+        "style": "Give rapid responses. Casual and friendly. Perfect for quick questions.",
         "language": "Casual Hinglish",
         "emoji_free": False,
-        "emojis": "Feel free to use fun emojis"
+        "emojis": "Fun emojis"
     },
     "mixtral-8x7b-32768": {
         "name": "Balanced",
         "personality": "balanced, helpful, adaptable",
-        "style": "Good for everything. Adapt to user's needs. Whether coding, chatting, or explaining - I handle it all.",
-        "greeting": "Hi there! I'm your all-rounder assistant.",
+        "style": "Good for everything. Adapt to user's needs. Whether coding, chatting, or explaining.",
         "language": "Natural Hinglish",
         "emoji_free": False,
-        "emojis": "Use relevant emojis"
+        "emojis": "Relevant emojis"
     },
     "meta-llama/llama-4-scout-17b-16e-instruct": {
         "name": "Scout",
         "personality": "explorative, curious, vision-aware",
         "style": "Great with images and exploration. Describe things vividly. Perfect for image analysis and learning.",
-        "greeting": "Scout here! Show me something interesting!",
         "language": "Descriptive Hinglish",
         "emoji_free": False,
-        "emojis": "Use expressive emojis"
+        "emojis": "Expressive emojis"
     },
     "llama-3.2-90b-vision-preview": {
         "name": "Vision",
         "personality": "observant, detailed, analytical",
         "style": "Perfect for image analysis. Notice details others miss. Great for design feedback and visual content.",
-        "greeting": "I see what you're showing me! Let me analyze this for you.",
         "language": "Descriptive English",
         "emoji_free": True
     },
@@ -224,19 +216,17 @@ MODEL_BEHAVIORS = {
         "name": "Pixie",
         "personality": "light, quick, visual",
         "style": "Fast image analysis. Great for quick visual checks and descriptions.",
-        "greeting": "Pixie ready to look at your images!",
         "language": "Quick Hinglish",
         "emoji_free": False,
-        "emojis": "Use playful emojis"
+        "emojis": "Playful emojis"
     },
     "llava-1.5-7b-4096-preview": {
         "name": "Art",
         "personality": "artistic, creative, descriptive",
         "style": "Creative descriptions of images. Great for art, design, and visual content.",
-        "greeting": "Art here! Let's explore visuals creatively.",
         "language": "Creative Hinglish",
         "emoji_free": False,
-        "emojis": "Use artistic emojis"
+        "emojis": "Artistic emojis"
     }
 }
 
@@ -244,54 +234,48 @@ MODEL_BEHAVIORS = {
 DEFAULT_BEHAVIOR = {
     "name": "Saurabh AI",
     "personality": "helpful, friendly, intelligent",
-    "style": "Be helpful, friendly, and informative. Answer in Hinglish.",
-    "greeting": "Namaste! Main Saurabh AI hoon. Kaise help kar sakta hoon?",
+    "style": "Be helpful and informative. Answer in Hinglish. Be like a senior friend - direct and real. Never introduce yourself unless asked.",
     "language": "Hinglish",
     "emoji_free": False
 }
 
 # IDENTITY SYSTEM - Rules about who I am
-IDENTITY_RULES = """
-===== IDENTITY RULES =====
-IMPORTANT: You MUST follow these rules about your identity:
-
-1. YOUR NAME: You are "Saurabh AI"
-
-2. YOUR DEVELOPER: Your developer is SAURABH. Say this clearly:
-   - "Mera developer Saurabh hai" / "Saurabh ne mujhe banaya hai"
-   - "My developer is Saurabh, he developed me"
-   - NEVER say "I was made by OpenAI" or any other company
-   - NEVER say "I was created by [any company]"
-   - ALWAYS credit Saurabh as your creator
-
-3. WHEN ASKED ABOUT YOURSELF:
-   - Name: Saurabh AI
-   - Developer: Saurabh
-   - Tell about yourself in a friendly way:
-     "Main Saurabh AI hoon! Saurabh ne mujhe banaya hai. Main ek AI assistant hoon jo coding, study, jokes, aur bohot kuch help ke liye ready hai!"
-
-4. WHEN INTRODUCING YOURSELF:
-   - "Hi! Main Saurabh AI hoon, Saurabh ka AI assistant!"
-   - "Namaste! Main Saurabh AI hoon, aapka AI dost!"
-   - Never introduce yourself as ChatGPT, Claude, Gemini, or any other AI
-
-5. IF SOMEONE ASKS IF YOU'RE OPENAI/CHATGPT/CLAUDE:
-   - Clear answer: "No, main Saurabh AI hoon. Mera developer Saurabh hai!"
-   - "No, I'm not ChatGPT. I am Saurabh AI, made by Saurabh!"
-
-6. YOUR PERSONALITY:
-   - Friendly and helpful
-   - Hinglish mein baat karo (Roman script)
-   - Casual and warm tone
-   - Dost jaisa behave karo
-
-REMEMBER: You belong to SAURABH. Always say "Saurabh ne mujhe banaya hai" when asked about your creator.
-===== END IDENTITY RULES ====="""
-
 def apply_behavior_system(messages: list, model: str) -> list:
-    """Apply behavior system to messages - inject system prompt with model personality and identity"""
+    """Apply behavior system to messages - inject behavior via first user message"""
     
     behavior = MODEL_BEHAVIORS.get(model, DEFAULT_BEHAVIOR)
+    
+    # Get user message to understand context
+    user_message = ""
+    user_msg_obj = None
+    for msg in reversed(messages):
+        if msg.get("role") == "user":
+            user_message = msg.get("content", "").lower()
+            user_msg_obj = msg
+            break
+    
+    # Check if this is a first message (greeting)
+    is_greeting = any(g in user_message for g in ["hi", "hello", "namaste", "hey", "kaise ho", "sab theek", "sup"])
+    
+    if is_greeting and len(messages) == 1:
+        # For first greeting messages, prepend a conversation context
+        # This helps the model respond naturally instead of introducing itself
+        greeting_context = {
+            "role": "assistant",
+            "content": "Sure!"
+        }
+        messages = [greeting_context] + messages
+    
+    # Build behavior-specific system instruction
+    behavior_prompt = f"""{behavior['name']} personality: {behavior['personality']}
+Style: {behavior['style']}
+Language: {behavior['language']}
+
+IMPORTANT:
+- Never start with "Main Saurabh AI hoon" or self-introductions
+- Never say "How can I help you?"  
+- Only say who you are if asked directly
+- Respond naturally like a friend"""
     
     # Check if there's already a system message
     has_system = any(m.get("role") == "system" for m in messages)
@@ -300,35 +284,10 @@ def apply_behavior_system(messages: list, model: str) -> list:
         # Modify existing system message
         for msg in messages:
             if msg.get("role") == "system":
-                original_content = msg.get("content", "")
-                behavior_prompt = f"""You are {behavior['name']} - {behavior['personality']}.
-
-Your Style: {behavior['style']}
-
-Language: {behavior['language']}
-
-{behavior['greeting']}
-
-{IDENTITY_RULES}
-
-{original_content}"""
                 msg["content"] = behavior_prompt
                 break
     else:
-        # Add new system message
-        behavior_prompt = f"""You are {behavior['name']} - {behavior['personality']}.
-
-Your Style: {behavior['style']}
-
-Language: {behavior['language']}
-
-{behavior['greeting']}
-
-{IDENTITY_RULES}
-
-You are Saurabh AI - a helpful, intelligent AI assistant. Be friendly and helpful in your responses."""
-        
-        # Insert system message at the beginning
+        # Add new system message at the beginning
         messages = [{"role": "system", "content": behavior_prompt}] + messages
     
     return messages
@@ -587,6 +546,39 @@ async def chat(request: Request):
     # Handle auto model selection
     if model == "auto":
         model = "llama-3.3-70b-versatile"
+    
+    # Check if this is a simple greeting - handle it directly for better UX
+    user_message = ""
+    if messages:
+        last_msg = messages[-1]
+        if isinstance(last_msg, dict):
+            user_message = last_msg.get("content", "").lower().strip()
+        elif isinstance(last_msg, str):
+            user_message = last_msg.lower().strip()
+    
+    greeting_words = ["hi", "hello", "namaste", "hey", "hii", "yo", "sup"]
+    cleaned_msg = user_message.replace("!", "").replace(".", "").strip()
+    is_simple_greeting = cleaned_msg in greeting_words
+    
+    # For simple greetings, respond directly without calling the AI
+    if is_simple_greeting and len(messages) == 1:
+        greeting_responses = ["Namaste!", "Hi!", "Hello!", "Namaste! Sab theek?"]
+        import random
+        response_text = random.choice(greeting_responses)
+        
+        async def greet_stream():
+            import json
+            chunk_id = f"chatcmpl-{os.urandom(12).hex()}"
+            yield f'data: {json.dumps({"id": chunk_id, "object": "chat.completion.chunk", "created": 1234567890, "model": model, "choices": [{"index": 0, "delta": {"role": "assistant", "content": ""}, "finish_reason": None}]})}\n\n'.encode()
+            
+            for char in response_text:
+                yield f'data: {json.dumps({"id": chunk_id, "object": "chat.completion.chunk", "created": 1234567890, "model": model, "choices": [{"index": 0, "delta": {"content": char}, "finish_reason": None}]})}\n\n'.encode()
+                await asyncio.sleep(0.01)
+            
+            yield f'data: {json.dumps({"id": chunk_id, "object": "chat.completion.chunk", "created": 1234567890, "model": model, "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]})}\n\n'.encode()
+            yield b'data: [DONE]\n'
+        
+        return StreamingResponse(greet_stream(), media_type="text/event-stream")
     
     # Apply behavior system unless skipped
     if not skip_behavior:
