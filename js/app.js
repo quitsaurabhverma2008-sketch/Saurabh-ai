@@ -310,7 +310,7 @@ const App = {
    */
   getAPIUrl() {
     // Can be configured for production
-    return 'http://localhost:8000';
+    return window.location.origin;
   },
 
   /**

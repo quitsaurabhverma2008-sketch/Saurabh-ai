@@ -16,7 +16,7 @@ const Chat = {
   messageCounter: 0,
 
   // API base URL
-  API_BASE: 'http://localhost:8000',
+  API_BASE: window.location.origin,
 
   /**
    * Initialize chat
