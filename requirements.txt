@@ -4,3 +4,4 @@ httpx==0.26.0
 python-multipart==0.0.6
 starlette>=0.35.0
 asgiref>=3.7.0
+mangum>=0.17.0
