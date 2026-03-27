@@ -120,7 +120,26 @@ app.add_middleware(
 
 # Load API Keys
 def load_config() -> dict:
-    """Load API keys from config file"""
+    """Load API keys from config file or environment variables"""
+    # First try to load from environment variables (for Render deployment)
+    groq_keys = []
+    for i in range(1, 11):
+        key = os.environ.get(f"GROQ_API_KEY_{i}", "")
+        if key:
+            groq_keys.append(key)
+    
+    or_key = os.environ.get("OR_KEY", "")
+    jwt_secret = os.environ.get("JWT_SECRET", AUTH_CONFIG["jwt_secret"])
+    
+    if groq_keys:
+        print(f"[CONFIG] Loaded {len(groq_keys)} GROQ keys from environment")
+        return {
+            "groq_keys": groq_keys,
+            "openrouter_key": or_key,
+            "jwt_secret": jwt_secret
+        }
+    
+    # Fallback to config file (for local development)
     try:
         with open(CONFIG_PATH, "r") as f:
             return json.load(f)
@@ -138,6 +157,8 @@ POLLINATIONS_KEYS = config.get("pollinations_keys", [
     "sk_m0lXVlnX26OBGAr2TmAztk318osMzaU7",
 ])
 OR_KEY = config.get("openrouter_key", "")
+if config.get("jwt_secret"):
+    AUTH_CONFIG["jwt_secret"] = config["jwt_secret"]
 OR_REFERER = config.get("openrouter_referer", "https://saurabh-ai.app")
 OR_TITLE = config.get("openrouter_title", "Saurabh AI")
 
