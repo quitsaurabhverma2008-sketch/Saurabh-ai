@@ -409,6 +409,12 @@ async def login_page():
     return FileResponse(login_path)
 
 
+@app.get("/ping")
+async def ping():
+    """Lightweight ping for sleep detection - responds fast"""
+    return {"pong": True}
+
+
 @app.get("/health")
 async def health_check():
     """Detailed health check"""

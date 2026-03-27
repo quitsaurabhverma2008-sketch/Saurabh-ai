@@ -83,6 +83,9 @@ const Chat = {
 
     if (!message || this.isStreaming) return;
 
+    // Wait for server to be awake
+    await ServerMonitor.waitForServer();
+
     // Clear input
     input.value = '';
     input.style.height = 'auto';

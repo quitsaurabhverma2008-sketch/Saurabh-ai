@@ -344,8 +344,131 @@ const App = {
   }
 };
 
+// Server Monitor - Handles sleep/wake detection
+const ServerMonitor = {
+  RETRY_INTERVAL: 5,
+  PING_TIMEOUT: 5000,
+  
+  isServerAwake: false,
+  countdownValue: 5,
+  countdownInterval: null,
+  retryCount: 0,
+  maxRetries: 100,
+  initialized: false,
+  
+  getAPIUrl() {
+    return App.getAPIUrl();
+  },
+  
+  async checkHealth() {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.PING_TIMEOUT);
+      
+      const res = await fetch(`${this.getAPIUrl()}/ping`, {
+        method: 'GET',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeout);
+      
+      if (res.ok) {
+        this.onServerAwake();
+        return true;
+      }
+    } catch (e) {
+      // Server is sleep
+    }
+    this.onServerSleep();
+    return false;
+  },
+  
+  onServerSleep() {
+    this.isServerAwake = false;
+    
+    if (!this.initialized) {
+      this.initialized = true;
+      this.showSleepOverlay();
+      this.startCountdown();
+    }
+  },
+  
+  onServerAwake() {
+    this.isServerAwake = true;
+    this.stopCountdown();
+    this.hideSleepOverlay();
+    this.initialized = false;
+    this.retryCount = 0;
+  },
+  
+  showSleepOverlay() {
+    const overlay = document.getElementById('sleepOverlay');
+    const splash = document.getElementById('splash');
+    
+    if (splash) splash.classList.add('out');
+    if (overlay) overlay.classList.add('show');
+    
+    this.updateCountdownDisplay(this.RETRY_INTERVAL);
+  },
+  
+  hideSleepOverlay() {
+    const overlay = document.getElementById('sleepOverlay');
+    const splash = document.getElementById('splash');
+    
+    if (overlay) overlay.classList.remove('show');
+    if (splash) splash.classList.remove('out');
+  },
+  
+  updateCountdownDisplay(value) {
+    const countdown = document.getElementById('sleepCountdown');
+    const status = document.getElementById('sleepStatus');
+    
+    if (countdown) countdown.textContent = value;
+    if (status) status.textContent = `Retrying in ${value} seconds...`;
+  },
+  
+  startCountdown() {
+    this.countdownValue = this.RETRY_INTERVAL;
+    this.updateCountdownDisplay(this.countdownValue);
+    
+    this.countdownInterval = setInterval(() => {
+      this.countdownValue--;
+      
+      if (this.countdownValue <= 0) {
+        this.countdownValue = this.RETRY_INTERVAL;
+        this.retryCount++;
+        
+        if (this.retryCount > this.maxRetries) {
+          this.stopCountdown();
+          const status = document.getElementById('sleepStatus');
+          if (status) status.textContent = 'Server not responding. Retrying...';
+          this.retryCount = 0;
+        }
+        
+        this.checkHealth();
+      }
+      
+      this.updateCountdownDisplay(this.countdownValue);
+    }, 1000);
+  },
+  
+  stopCountdown() {
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+      this.countdownInterval = null;
+    }
+  },
+  
+  async waitForServer() {
+    while (!this.isServerAwake) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+};
+
 // Initialize app when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await ServerMonitor.checkHealth();
   App.init();
 });
 
