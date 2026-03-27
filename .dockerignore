@@ -1,0 +1,44 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+.pytest_cache
+.venv
+venv
+env
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Database (will be created on server)
+*.db
+*.sqlite
+
+# Config with secrets (create new one on server)
+config/api_keys.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files
+test_*.py
+*_test.py
