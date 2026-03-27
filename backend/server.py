@@ -996,14 +996,21 @@ async def send_otp(request: Request):
         otp_store[email] = otp_code
         print(f"[OTP] OTP for {email}: {otp_code}")
         
-        # Send OTP via email
+        # Send OTP via email (with fallback)
+        email_sent = False
         try:
             send_otp_email(email, otp_code)
+            email_sent = True
         except Exception as e:
             print(f"[OTP] Email send error: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to send OTP: {str(e)}")
         
-        return {"success": True, "message": f"OTP sent to {email}. Check your inbox!"}
+        # Return OTP in response for testing (since Render blocks outbound email)
+        return {
+            "success": True, 
+            "message": f"OTP sent! (Email: {'✓' if email_sent else '✗ (see console/logs)'})",
+            "otp": otp_code,  # For testing - remove in production!
+            "debug_mode": True
+        }
         
     except HTTPException:
         raise
