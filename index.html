@@ -1554,7 +1554,7 @@ function exportChat() {
    SERVER MONITOR - Sleep/Wake Detection
 ═══════════════════════════════════════ */
 const ServerMonitor = {
-  RETRY_INTERVAL: 5,
+  RETRY_INTERVAL: 60,
   PING_TIMEOUT: 5000,
   isServerAwake: false,
   countdownValue: 5,
@@ -1615,18 +1615,16 @@ const ServerMonitor = {
     this.updateCountdownDisplay(this.countdownValue);
     this.countdownInterval = setInterval(() => {
       this.countdownValue--;
-      if (this.countdownValue <= 0) {
-        this.countdownValue = this.RETRY_INTERVAL;
-        this.retryCount++;
-        if (this.retryCount > this.maxRetries) {
-          this.stopCountdown();
-          const status = document.getElementById('sleepStatus');
-          if (status) status.textContent = 'Server not responding. Retrying...';
-          this.retryCount = 0;
-        }
-        this.checkHealth();
-      }
       this.updateCountdownDisplay(this.countdownValue);
+      if (this.countdownValue <= 0) {
+        this.stopCountdown();
+        const status = document.getElementById('sleepStatus');
+        if (status) status.textContent = 'Server not responding. Retrying in 60 seconds...';
+        // Retry after 60 seconds
+        setTimeout(() => {
+          if (!this.isServerAwake) { this.startCountdown(); }
+        }, 60000);
+      }
     }, 1000);
   },
   
