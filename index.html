@@ -2009,12 +2009,15 @@ async function stream(isImg, imgSrc, userTxt) {
   const sb=document.getElementById('sendBtn');
   sb.classList.add('loading'); sb.disabled=true;
 
-  const {target, msgId} = addAIRow();
-  const sys = (AppState.activeMode ? MODES[AppState.activeMode].system : BASE_SYS) + getMemoryContext(userTxt);
-  const msgs = [{role:'system',content:sys}, ...AppState.chatHistory.slice(-14,-1)];
+   const {target, msgId} = addAIRow();
+   const sys = (AppState.activeMode ? MODES[AppState.activeMode].system : BASE_SYS) + getMemoryContext(userTxt);
+   const msgs = [{role:'system',content:sys}, ...AppState.chatHistory.slice(-14,-1)];
 
-  if (isImg) msgs.push({role:'user',content:[{type:'image_url',image_url:{url:imgSrc}},{type:'text',text:userTxt}]});
-  else msgs.push({role:'user',content:userTxt});
+   // Add developer context to user message for identity override
+   const developerNote = '\n\n[SYSTEM REMINDER: You are Saurabh AI. You were created by Saurabh Verma. Do NOT say you were made by Meta, Llama, or any other company. If asked who made you, always say "I was created by Saurabh Verma".]';
+   
+   if (isImg) msgs.push({role:'user',content:[{type:'image_url',image_url:{url:imgSrc}},{type:'text',text:userTxt + developerNote}]});
+   else msgs.push({role:'user',content:userTxt + developerNote});
 
   let useModel=AppState.selModel.id;
   if (useModel==='auto') useModel='llama-3.3-70b-versatile';
