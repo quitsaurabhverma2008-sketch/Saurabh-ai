@@ -1,0 +1,51 @@
+services:
+  - type: web
+    name: saurabh-ai
+    env: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: python backend/server.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      - key: GROQ_API_KEY_1
+        sync: false
+      - key: GROQ_API_KEY_2
+        sync: false
+      - key: GROQ_API_KEY_3
+        sync: false
+      - key: GROQ_API_KEY_4
+        sync: false
+      - key: GROQ_API_KEY_5
+        sync: false
+      - key: GROQ_API_KEY_6
+        sync: false
+      - key: GROQ_API_KEY_7
+        sync: false
+      - key: GROQ_API_KEY_8
+        sync: false
+      - key: GROQ_API_KEY_9
+        sync: false
+      - key: GROQ_API_KEY_10
+        sync: false
+      - key: NVIDIA_API_KEY_1
+        sync: false
+      - key: NVIDIA_API_KEY_2
+        sync: false
+      - key: NVIDIA_API_KEY_3
+        sync: false
+      - key: NVIDIA_API_KEY_4
+        sync: false
+      - key: NVIDIA_API_KEY_5
+        sync: false
+      - key: NVIDIA_API_KEY_6
+        sync: false
+      - key: NVIDIA_API_KEY_7
+        sync: false
+      - key: NVIDIA_API_KEY_8
+        sync: false
+      - key: NVIDIA_API_KEY_9
+        sync: false
+      - key: NVIDIA_API_KEY_10
+        sync: false

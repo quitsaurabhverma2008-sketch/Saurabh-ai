@@ -112,17 +112,33 @@ def load_config() -> dict:
             nvidia_keys.append(key)
     
     if groq_keys or nvidia_keys:
+        print(f"Loaded from env: {len(groq_keys)} GROQ keys, {len(nvidia_keys)} NVIDIA keys")
         return {
             "groq_keys": groq_keys,
             "nvidia_keys": nvidia_keys,
         }
     
-    try:
-        with open(CONFIG_PATH, "r") as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"Error loading config: {e}")
-        return {"groq_keys": [], "nvidia_keys": []}
+    # Try multiple possible config paths
+    possible_paths = [
+        CONFIG_PATH,
+        os.path.join(os.path.dirname(__file__), "..", "config", "api_keys.json"),
+        os.path.join(".", "config", "api_keys.json"),
+        os.path.join("..", "config", "api_keys.json"),
+        "config/api_keys.json",
+    ]
+    
+    for path in possible_paths:
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+                if data.get("groq_keys") or data.get("nvidia_keys"):
+                    print(f"Loaded config from: {path}")
+                    return data
+        except Exception as e:
+            continue
+    
+    print("WARNING: No API keys found! Set environment variables or add config file.")
+    return {"groq_keys": [], "nvidia_keys": []}
 
 config = load_config()
 GROQ_KEYS = config.get("groq_keys", [])
