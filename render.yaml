@@ -1,3 +1,6 @@
+# Saurabh AI - Render Configuration
+# Add your API keys in Render Dashboard > Environment tab
+
 services:
   - type: web
     name: saurabh-ai
@@ -6,9 +9,13 @@ services:
     region: oregon
     buildCommand: pip install -r requirements.txt
     startCommand: python backend/server.py
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.0"
+      
+      # GROQ API Keys (10 keys)
+      # Get from: https://console.groq.com/
       - key: GROQ_API_KEY_1
         sync: false
       - key: GROQ_API_KEY_2
@@ -29,6 +36,9 @@ services:
         sync: false
       - key: GROQ_API_KEY_10
         sync: false
+      
+      # NVIDIA API Keys (10 keys)  
+      # Get from: https://build.nvidia.com/
       - key: NVIDIA_API_KEY_1
         sync: false
       - key: NVIDIA_API_KEY_2

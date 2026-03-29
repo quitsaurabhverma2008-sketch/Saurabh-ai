@@ -111,33 +111,41 @@ def load_config() -> dict:
         if key:
             nvidia_keys.append(key)
     
+    print(f"[CONFIG] Environment: GROQ={len(groq_keys)}, NVIDIA={len(nvidia_keys)}")
+    
     if groq_keys or nvidia_keys:
-        print(f"Loaded from env: {len(groq_keys)} GROQ keys, {len(nvidia_keys)} NVIDIA keys")
         return {
             "groq_keys": groq_keys,
             "nvidia_keys": nvidia_keys,
         }
     
-    # Try multiple possible config paths
+    # Try multiple possible config paths for Render
+    import pathlib
     possible_paths = [
         CONFIG_PATH,
         os.path.join(os.path.dirname(__file__), "..", "config", "api_keys.json"),
-        os.path.join(".", "config", "api_keys.json"),
-        os.path.join("..", "config", "api_keys.json"),
-        "config/api_keys.json",
+        os.path.join(os.getcwd(), "config", "api_keys.json"),
+        os.path.join(pathlib.Path.home(), "saurabh-ai", "config", "api_keys.json"),
+        "/opt/render/project/src/config/api_keys.json",  # Render default path
+        "./config/api_keys.json",
     ]
     
+    print(f"[CONFIG] Trying config file paths...")
     for path in possible_paths:
         try:
-            with open(path, "r") as f:
-                data = json.load(f)
-                if data.get("groq_keys") or data.get("nvidia_keys"):
-                    print(f"Loaded config from: {path}")
-                    return data
+            if os.path.exists(path):
+                with open(path, "r") as f:
+                    data = json.load(f)
+                    if data.get("groq_keys") or data.get("nvidia_keys"):
+                        print(f"[CONFIG] SUCCESS: Loaded from {path}")
+                        print(f"[CONFIG] Found: {len(data.get('groq_keys', []))} GROQ, {len(data.get('nvidia_keys', []))} NVIDIA keys")
+                        return data
         except Exception as e:
+            print(f"[CONFIG] Failed {path}: {e}")
             continue
     
-    print("WARNING: No API keys found! Set environment variables or add config file.")
+    print("[CONFIG] WARNING: No API keys found!")
+    print("[CONFIG] Set NVIDIA_API_KEY_1 to NVIDIA_API_KEY_10 environment variables on Render")
     return {"groq_keys": [], "nvidia_keys": []}
 
 config = load_config()
