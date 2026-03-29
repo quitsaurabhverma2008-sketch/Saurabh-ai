@@ -1386,18 +1386,91 @@ function logout() {
 }
 
 const MODELS = [
-  { id:'auto',                                           api:'groq', name:'⚡ Auto Best',        color:'#d4845a', desc:'Query ke hisaab se best model auto-select' },
-  { id:'llama-3.3-70b-versatile',                      api:'groq', name:'🦙 Llama 3.3 70B',    color:'#3b82f6', desc:'Meta latest — smart & fast' },
-  { id:'llama-4-maverick-17b-128e-instruct',           api:'groq', name:'🦙 Llama 4 Maverick', color:'#5b21b6', desc:'Fast & Smart' },
-  { id:'deepseek-r1-distill-llama-70b',                api:'groq', name:'🧠 DeepSeek R1',     color:'#22c55e', desc:'Best Reasoning' },
-  { id:'qwen/qwen3-32b',                               api:'groq', name:'🌐 Qwen 3 32B',      color:'#06b6d4', desc:'Multilingual' },
-  { id:'llama-3.1-8b-instant',                         api:'groq', name:'🦙 Llama 3.1 8B',    color:'#60a5fa', desc:'Fastest' },
-  { id:'mixtral-8x7b-32768',                           api:'groq', name:'⚡ Mixtral 8x7B',    color:'#f59e0b', desc:'Balanced' },
-  { id:'meta-llama/llama-4-scout-17b-16e-instruct',   api:'groq', name:'🦅 Llama 4 Scout',   color:'#7c3aed', desc:'Vision - 128K context' },
-  { id:'llama-3.2-90b-vision-preview',                 api:'groq', name:'🦅 Llama 3.2 90B',   color:'#8b5cf6', desc:'Vision - Powerful' },
-  { id:'llama-3.2-11b-vision-preview',                 api:'groq', name:'🦅 Llama 3.2 11B',   color:'#a78bfa', desc:'Vision - Fast' },
-  { id:'llava-1.5-7b-4096-preview',                    api:'groq', name:'🦅 LLaVA 7B',        color:'#c4b5fd', desc:'Vision - Lightweight' },
+  // AUTO SELECT (AI will choose best model)
+  { id:'ai-selected', api:'auto', name:'🤖 AI Auto Select', color:'#d4845a', desc:'AI automatically selects best model', category:'auto' },
+  
+  // GROQ MODELS
+  { id:'llama-3.3-70b-versatile', api:'groq', name:'🦙 Sage - Llama 3.3 70B', color:'#3b82f6', desc:'Best quality, balanced', category:'chat' },
+  { id:'llama-4-maverick-17b-128e-instruct', api:'groq', name:'🦙 Flash - Llama 4 Maverick', color:'#5b21b6', desc:'Fast & Smart, multimodal', category:'vision' },
+  { id:'deepseek-r1-distill-llama-70b', api:'groq', name:'🧠 Logic - DeepSeek R1', color:'#22c55e', desc:'Best Reasoning, coding', category:'reasoning' },
+  { id:'qwen/qwen3-32b', api:'groq', name:'🌐 Poly - Qwen 3 32B', color:'#06b6d4', desc:'Multilingual, creative', category:'multilingual' },
+  { id:'llama-3.1-8b-instant', api:'groq', name:'⚡ Quick - Llama 3.1 8B', color:'#60a5fa', desc:'Fastest responses', category:'chat' },
+  { id:'mixtral-8x7b-32768', api:'groq', name:'⚖️ Balanced - Mixtral 8x7B', color:'#f59e0b', desc:'Good for everything', category:'chat' },
+  { id:'meta-llama/llama-4-scout-17b-16e-instruct', api:'groq', name:'🦅 Scout - Llama 4 Vision', color:'#7c3aed', desc:'128K context, vision', category:'vision' },
+  { id:'llama-3.2-90b-vision-preview', api:'groq', name:'👁️ Vision - Llama 3.2 90B', color:'#8b5cf6', desc:'Powerful image analysis', category:'vision' },
+  { id:'llama-3.2-11b-vision-preview', api:'groq', name:'👁️ Pixie - Llama 3.2 11B', color:'#a78bfa', desc:'Fast vision', category:'vision' },
+  { id:'llava-1.5-7b-4096-preview', api:'groq', name:'🎨 Art - LLaVA 7B', color:'#c4b5fd', desc:'Creative image analysis', category:'vision' },
+  
+  // NVIDIA MODELS - REASONING
+  { id:'deepseek-ai/deepseek-v3.2', api:'nvidia', name:'🧠 DeepSeek V3.2', color:'#ff6b6b', desc:'685B reasoning, 128K context', category:'reasoning' },
+  { id:'moonshotai/kimi-k2-instruct', api:'nvidia', name:'🚀 Kimi K2', color:'#4ecdc4', desc:'MoE, 128K, best all-rounder', category:'reasoning' },
+  { id:'deepseek-ai/deepseek-v3.1', api:'nvidia', name:'🧠 DeepSeek V3.1', color:'#ff8c42', desc:'Fast reasoning, 128K', category:'reasoning' },
+  { id:'qwen/qwq-32b', api:'nvidia', name:'🤔 QwQ-32B', color:'#ffd93d', desc:'Reasoning for hard problems', category:'reasoning' },
+  { id:'deepseek-ai/deepseek-r1', api:'nvidia', name:'🧠 DeepSeek R1', color:'#c9b1ff', desc:'State-of-art reasoning', category:'reasoning' },
+  { id:'marin/marin-8b-instruct', api:'nvidia', name:'🧮 Marin 8B', color:'#6bcb77', desc:'Math, science reasoning', category:'reasoning' },
+  { id:'nvidia/llama-3.1-nemotron-ultra-253b-v1', api:'nvidia', name:'⚡ Nemotron Ultra', color:'#4d96ff', desc:'NVIDIA best general', category:'reasoning' },
+  { id:'nvidia/llama-3.3-nemotron-super-49b-v1', api:'nvidia', name:'🧠 Nemotron Super', color:'#ff6b9d', desc:'Strong math performance', category:'reasoning' },
+  
+  // NVIDIA MODELS - CODING
+  { id:'z-ai/glm-4.7', api:'nvidia', name:'💻 GLM-4.7', color:'#a8e6cf', desc:'Coding partner, tool use', category:'coding' },
+  { id:'mistralai/devstral-2-123b-instruct-2512', api:'nvidia', name:'💻 Devstral 123B', color:'#ffaaa5', desc:'SoTA code model, 256K', category:'coding' },
+  { id:'qwen/qwen3-coder-480b-a35b-instruct', api:'nvidia', name:'💻 Qwen3 Coder 480B', color:'#ffd3b6', desc:'Agentic coding, 256K', category:'coding' },
+  { id:'microsoft/phi-4', api:'nvidia', name:'💻 Phi-4', color:'#dcedc1', desc:'Small, fast, great coding', category:'coding' },
+  { id:'qwen/qwen2.5-coder-7b-instruct', api:'nvidia', name:'💻 Qwen2.5 Coder 7B', color:'#ffb7b2', desc:'Mid-size code model', category:'coding' },
+  { id:'mistralai/mamba-codestral-7b-v0.1', api:'nvidia', name:'💻 Codestral 7B', color:'#e2f0cb', desc:'Code completion', category:'coding' },
+  { id:'ibm/granite-3.3-8b-instruct', api:'nvidia', name:'💻 Granite 8B', color:'#b5ead7', desc:'Reasoning and coding', category:'coding' },
+  
+  // NVIDIA MODELS - VISION
+  { id:'google/gemma-3-27b-it', api:'nvidia', name:'👁️ Gemma 3 27B', color:'#c7ceea', desc:'Google best multimodal', category:'vision' },
+  { id:'meta/llama-4-scout-17b-16e-instruct', api:'nvidia', name:'🦅 Llama 4 Scout', color:'#e8b4b8', desc:'10M context, vision', category:'vision' },
+  { id:'nvidia/cosmos-nemotron-34b', api:'nvidia', name:'🌌 Cosmos Nemotron', color:'#b8d8d8', desc:'Text/img/video understanding', category:'vision' },
+  { id:'microsoft/phi-3.5-vision-instruct', api:'nvidia', name:'👁️ Phi-3.5 Vision', color:'#a8d8ea', desc:'Image reasoning', category:'vision' },
+  { id:'google/google-paligemma', api:'nvidia', name:'🖼️ PaliGemma', color:'#f8b500', desc:'Vision language model', category:'vision' },
+  { id:'nvidia/internvl2-14b', api:'nvidia', name:'🔍 InternVL2 14B', color:'#f67280', desc:'Strong vision-language', category:'vision' },
+  
+  // NVIDIA MODELS - CHAT / GENERAL
+  { id:'mistralai/mistral-large-3-675b-instruct-2512', api:'nvidia', name:'🏆 Mistral Large 3', color:'#ff6f61', desc:'SoTA general purpose MoE', category:'chat' },
+  { id:'mistralai/mistral-small-3.1-24b-instruct-2503', api:'nvidia', name:'⚡ Mistral Small 3.1', color:'#88d8b0', desc:'Efficient, multilingual', category:'chat' },
+  { id:'mistralai/mistral-medium-3-instruct', api:'nvidia', name:'⚖️ Mistral Medium 3', color:'#ffeaa7', desc:'Enterprise multimodal', category:'chat' },
+  { id:'microsoft/phi-3.5-mini-instruct', api:'nvidia', name:'🌟 Phi-3.5 Mini', color:'#dfe6e9', desc:'Multilingual, fast', category:'chat' },
+  { id:'mistralai/mistral-7b-instruct-v0.2', api:'nvidia', name:'🦄 Mistral 7B', color:'#fab1a0', desc:'Instruction following', category:'chat' },
+  { id:'google/gemma-7b', api:'nvidia', name:'💎 Gemma 7B', color:'#74b9ff', desc:'Text understanding', category:'chat' },
+  { id:'mediatek/breeze-7b-instruct', api:'nvidia', name:'🌬️ Breeze 7B', color:'#a29bfe', desc:'Traditional Chinese', category:'chat' },
+  { id:'rakuten/rakutenai-7b-chat', api:'nvidia', name:'🏯 RakutenAI 7B', color:'#fd79a8', desc:'Japanese focus', category:'chat' },
+  
+  // NVIDIA MODELS - TOOL CALLING / AGENTIC
+  { id:'deepseek-ai/deepseek-v3_1-terminus', api:'nvidia', name:'🔧 DeepSeek V3.1-T', color:'#00cec9', desc:'Think/Non-Think, function calling', category:'tool_calling' },
+  { id:'mistralai/mistral-nemotron', api:'nvidia', name:'🤖 Mistral Nemotron', color:'#e17055', desc:'Agentic workflows', category:'tool_calling' },
+  { id:'stepfun-ai/step-3.5-flash', api:'nvidia', name:'⚡ Step 3.5 Flash', color:'#fdcb6e', desc:'200B agentic AI', category:'agentic' },
+  { id:'bytedance/seed-oss-36b-instruct', api:'nvidia', name:'🌱 Seed-OSS 36B', color:'#55a3ff', desc:'Long-context agentic', category:'agentic' },
+  { id:'moonshotai/kimi-k2-thinking', api:'nvidia', name:'💭 Kimi K2 Thinking', color:'#a8e6cf', desc:'Enhanced tool use', category:'agentic' },
+  
+  // NVIDIA MODELS - LONG CONTEXT
+  { id:'moonshotai/kimi-k2-instruct-0905', api:'nvidia', name:'📚 Kimi K2 Long', color:'#dda0dd', desc:'256K context', category:'long_context' },
+  { id:'mistralai/devstral-2-123b-instruct-2512', api:'nvidia', name:'📖 Devstral 256K', color:'#98d8c8', desc:'256K code context', category:'long_context' },
+  
+  // NVIDIA MODELS - MULTILINGUAL
+  { id:'thudm/chatglm3-6b', api:'nvidia', name:'🌍 ChatGLM3 6B', color:'#f8f4e3', desc:'Chinese/English', category:'multilingual' },
+  { id:'baichuan-inc/baichuan2-13b-chat', api:'nvidia', name:'🐉 Baichuan 2 13B', color:'#ffe4b5', desc:'Chinese/English chat', category:'multilingual' },
+  { id:'nvidia/nemotron-4-mini-hindi-4b-instruct', api:'nvidia', name:'🇮🇳 Nemotron Hindi', color:'#ff9966', desc:'Hindi-English bilingual', category:'multilingual' },
 ];
+
+// Category Icons
+const CATEGORY_ICONS = {
+  'auto': '🤖',
+  'reasoning': '🧠',
+  'coding': '💻',
+  'vision': '👁️',
+  'chat': '💬',
+  'tool_calling': '🔧',
+  'agentic': '🤖',
+  'long_context': '📚',
+  'multilingual': '🌍',
+  'safety': '🛡️',
+  'embeddings': '📊',
+  'tts': '🎙️',
+  'translation': '🔤'
+};
 
 const MODES = {
   coding: { label:'Coding Mode', color:'#60a5fa',
@@ -1762,15 +1835,54 @@ function openProfile()  { document.getElementById('profilePanel').classList.add(
 function closeProfile() { document.getElementById('profilePanel').classList.remove('show'); }
 
 /* ═══════════════════════════════════════
-   MODEL DROPDOWN
-═══════════════════════════════════════ */
+   MODEL DROPDOWN WITH CATEGORIES
+══════════════════════════════════════ */
+let selectedCategory = 'all';
+
 function buildDrop() {
-  document.getElementById('modelList').innerHTML = MODELS.map(m => `
+  // Get categories from models
+  const categories = ['all', 'groq', 'nvidia', 'reasoning', 'coding', 'vision', 'chat', 'tool_calling', 'agentic', 'multilingual'];
+  
+  // Build category tabs
+  let categoryTabs = categories.map(cat => {
+    const icons = { 'all': '🎯', 'groq': '⚡', 'nvidia': '🚀', 'reasoning': '🧠', 'coding': '💻', 'vision': '👁️', 'chat': '💬', 'tool_calling': '🔧', 'agentic': '🤖', 'multilingual': '🌍' };
+    const names = { 'all': 'All', 'groq': 'GROQ', 'nvidia': 'NVIDIA', 'reasoning': 'Reasoning', 'coding': 'Coding', 'vision': 'Vision', 'chat': 'Chat', 'tool_calling': 'Tool', 'agentic': 'Agent', 'multilingual': 'Multi' };
+    const active = selectedCategory === cat ? 'active-cat' : '';
+    return `<button class="cat-tab ${active}" onclick="filterByCategory('${cat}')">${icons[cat] || '📂'} ${names[cat]}</button>`;
+  }).join('');
+  
+  // Filter models
+  let filteredModels = MODELS;
+  if (selectedCategory === 'groq') filteredModels = MODELS.filter(m => m.api === 'groq');
+  else if (selectedCategory === 'nvidia') filteredModels = MODELS.filter(m => m.api === 'nvidia');
+  else if (selectedCategory !== 'all') filteredModels = MODELS.filter(m => m.category === selectedCategory);
+  
+  // Build model list with API badge
+  let modelList = filteredModels.map(m => {
+    const apiBadge = m.api === 'nvidia' ? '<span style="font-size:9px;background:#22c55e22;color:#22c55e;padding:2px 6px;border-radius:8px;margin-left:6px">NVIDIA</span>' : 
+                     m.api === 'groq' ? '<span style="font-size:9px;background:#f59e0b22;color:#f59e0b;padding:2px 6px;border-radius:8px;margin-left:6px">GROQ</span>' : '';
+    return `
     <div class="drop-item ${AppState.selModel.id===m.id?'active':''}" onclick="pickModel('${m.id}')">
       <div class="drop-dot" style="background:${m.color};box-shadow:0 0 6px ${m.color}88"></div>
-      <div class="drop-info"><div class="drop-name">${m.name}</div><div class="drop-desc">${m.desc}</div></div>
+      <div class="drop-info"><div class="drop-name">${m.name}${apiBadge}</div><div class="drop-desc">${m.desc}</div></div>
       <div class="drop-check">✓</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+  
+  // Add category tabs style
+  const style = `<style>
+    .cat-tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 8px; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+    .cat-tab { background: transparent; border: 1px solid var(--border2); border-radius: 16px; padding: 4px 10px; font-size: 10px; color: var(--text2); cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+    .cat-tab:hover { background: var(--surface2); color: var(--text); }
+    .cat-tab.active-cat { background: var(--a); border-color: var(--a); color: #fff; }
+  </style>`;
+  
+  document.getElementById('modelList').innerHTML = style + '<div class="cat-tabs">' + categoryTabs + '</div>' + modelList;
+}
+
+function filterByCategory(cat) {
+  selectedCategory = cat;
+  buildDrop();
 }
 function toggleDrop(e) {
   e.preventDefault();
@@ -2009,8 +2121,51 @@ function showMsgs() {
 function scroll() { document.getElementById('chatArea').scrollTop=99999; }
 
 /* ═══════════════════════════════════════
+   AI ANALYZER - Smart Model Selection
+══════════════════════════════════════ */
+async function analyzeAndSelectModel(message) {
+  if (AppState.selModel.id !== 'ai-selected') {
+    return AppState.selModel.id;
+  }
+  
+  try {
+    const token = localStorage.getItem('saurabh_token');
+    const res = await fetch(API_BASE + '/analyze-message', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (token || '')
+      },
+      body: JSON.stringify({ message: message })
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      if (data.suggested_model) {
+        // Update pill to show selected model
+        const model = data.suggested_model;
+        document.getElementById('pillLabel').textContent = '🤖 ' + model.name;
+        document.getElementById('pillDot').style.background = '#22c55e';
+        document.getElementById('pillDot').style.boxShadow = '0 0 6px #22c55e88';
+        
+        // Show detection indicator
+        const categoryInfo = data.category_info || {};
+        showToast(`${categoryInfo.icon || '🤖'} ${categoryInfo.name || 'AI'} selected (${Math.round(data.confidence * 100)}%)`);
+        
+        return model.model_id;
+      }
+    }
+  } catch (e) {
+    console.log('Analyzer error:', e);
+  }
+  
+  // Fallback
+  return 'deepseek-ai/deepseek-v3.2';
+}
+
+/* ═══════════════════════════════════════
    STREAM
-═══════════════════════════════════════ */
+══════════════════════════════════════ */
 async function stream(isImg, imgSrc, userTxt) {
   AppState.busy=true;
   const sb=document.getElementById('sendBtn');
@@ -2022,13 +2177,27 @@ async function stream(isImg, imgSrc, userTxt) {
 
    // Add developer info in user message
    const developerNote = '\n\n[REMEMBER: You are Saurabh AI. Created by Saurabh Verma. Never mention Meta, Facebook, Llama, OpenAI, Google, Anthropic or any company. Always say you were created by Saurabh Verma when asked.]';
-   
+    
    if (isImg) msgs.push({role:'user',content:[{type:'image_url',image_url:{url:imgSrc}},{type:'text',text:userTxt + developerNote}]});
    else msgs.push({role:'user',content:userTxt + developerNote});
 
-  let useModel=AppState.selModel.id;
-  if (useModel==='auto') useModel='llama-3.3-70b-versatile';
-  if (isImg) useModel='meta-llama/llama-4-maverick-17b-128e-instruct';
+  let useModel = AppState.selModel.id;
+  
+  // AI Auto Selection - analyze message and select best model
+  if (useModel === 'ai-selected' && !isImg) {
+    useModel = await analyzeAndSelectModel(userTxt);
+  } else if (useModel === 'ai-selected' && isImg) {
+    // For images, use vision model
+    useModel = 'google/gemma-3-27b-it';
+  }
+  
+  // Legacy auto fallback
+  if (useModel === 'auto') useModel = 'llama-3.3-70b-versatile';
+  
+  // Vision models for images
+  if (isImg && useModel.includes('groq')) {
+    useModel = 'meta-llama/llama-4-maverick-17b-128e-instruct';
+  }
 
   let full='', tickCount=0;
   const token = localStorage.getItem('saurabh_token');

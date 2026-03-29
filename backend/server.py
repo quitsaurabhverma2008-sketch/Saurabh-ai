@@ -1,6 +1,6 @@
 """
-Saurabh AI Backend - FastAPI Server with Load Balancer + Auth System
-Handles multiple API keys for unlimited users
+Saurabh AI Backend - FastAPI Server with Load Balancer + NVIDIA Integration
+Handles GROQ + NVIDIA APIs with 20 total keys + Smart AI Model Selection
 """
 
 import asyncio
@@ -21,7 +21,7 @@ import httpx
 # ============== AUTH CONFIGURATION ==============
 AUTH_CONFIG = {
     "jwt_secret": "saurabh-ai-secret-key-2026-very-secure",
-    "token_expiry_days": 365,  # Forever until logout
+    "token_expiry_days": 365,
     "min_password_length": 6,
 }
 
@@ -32,8 +32,6 @@ def init_database():
     """Initialize SQLite database for users"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
-    # Users table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             gmail TEXT PRIMARY KEY,
@@ -43,73 +41,55 @@ def init_database():
             login_count INTEGER DEFAULT 0
         )
     ''')
-    
     conn.commit()
     conn.close()
-    print("[AUTH] Database initialized with users table!")
+    print("[AUTH] Database initialized!")
 
 def hash_password(password: str) -> str:
-    """Hash password using SHA-256 with salt"""
     salt = "saurabh_ai_salt_2026"
     return hashlib.sha256((password + salt).encode()).hexdigest()
 
 def verify_password(password: str, password_hash: str) -> bool:
-    """Verify password against hash"""
     return hash_password(password) == password_hash
 
 def create_jwt_token(email: str) -> str:
-    """Create a simple JWT-like token"""
     import base64
     import json as json_mod
-    
     header = base64.urlsafe_b64encode(json_mod.dumps({"alg": "HS256", "typ": "JWT"}).encode()).decode()
     payload = base64.urlsafe_b64encode(json_mod.dumps({
         "email": email,
         "exp": (datetime.now() + timedelta(days=AUTH_CONFIG["token_expiry_days"])).isoformat(),
         "iat": datetime.now().isoformat()
     }).encode()).decode()
-    
     signature = hashlib.sha256((header + "." + payload + AUTH_CONFIG["jwt_secret"]).encode()).hexdigest()
     return f"{header}.{payload}.{signature}"
 
 def verify_jwt_token(token: str) -> Optional[str]:
-    """Verify JWT token and return email if valid"""
     try:
         import base64
         import json as json_mod
-        
         parts = token.split(".")
         if len(parts) != 3:
             return None
-        
         header, payload, signature = parts
-        
-        # Verify signature
         expected_sig = hashlib.sha256((header + "." + payload + AUTH_CONFIG["jwt_secret"]).encode()).hexdigest()
         if signature != expected_sig:
             return None
-        
-        # Decode payload
         payload_data = json_mod.loads(base64.urlsafe_b64decode(payload + "=="))
-        
-        # Check expiry
         exp = datetime.fromisoformat(payload_data["exp"])
         if datetime.now() > exp:
             return None
-        
         return payload_data["email"]
     except:
         return None
 
-# Initialize database on import
 init_database()
 
 # ============== CONFIGURATION ==============
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "api_keys.json")
 
-app = FastAPI(title="Saurabh AI Backend", version="1.0.0")
+app = FastAPI(title="Saurabh AI Backend", version="2.0.0")
 
-# CORS - Allow all origins for mobile app
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -118,236 +98,901 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load API Keys
 def load_config() -> dict:
-    """Load API keys from config file or environment variables"""
-    # First try to load from environment variables (for Render deployment)
     groq_keys = []
     for i in range(1, 11):
         key = os.environ.get(f"GROQ_API_KEY_{i}", "")
         if key:
             groq_keys.append(key)
     
-    or_key = os.environ.get("OR_KEY", "")
-    jwt_secret = os.environ.get("JWT_SECRET", AUTH_CONFIG["jwt_secret"])
+    nvidia_keys = []
+    for i in range(1, 11):
+        key = os.environ.get(f"NVIDIA_API_KEY_{i}", "")
+        if key:
+            nvidia_keys.append(key)
     
-    if groq_keys:
-        print(f"[CONFIG] Loaded {len(groq_keys)} GROQ keys from environment")
+    if groq_keys or nvidia_keys:
         return {
             "groq_keys": groq_keys,
-            "openrouter_key": or_key,
-            "jwt_secret": jwt_secret
+            "nvidia_keys": nvidia_keys,
         }
     
-    # Fallback to config file (for local development)
     try:
         with open(CONFIG_PATH, "r") as f:
             return json.load(f)
     except Exception as e:
         print(f"Error loading config: {e}")
-        return {"groq_keys": [], "openrouter_key": ""}
+        return {"groq_keys": [], "nvidia_keys": []}
 
 config = load_config()
 GROQ_KEYS = config.get("groq_keys", [])
-POLLINATIONS_KEYS = config.get("pollinations_keys", [
-    "sk_QZEKTfnghsiUTNH5wVZ4uL7bYZmzsRAu",
-    "sk_FBPT5me4vwsZJSVpATIorgC8sPDSvDTo",
-    "sk_ngA7UYkUveZBvAFNilx5jnKxvr6BOW8z",
-    "sk_a82JJY74rP8pP1fwIpB7lkhrCMBHADKE",
-    "sk_m0lXVlnX26OBGAr2TmAztk318osMzaU7",
-])
-OR_KEY = config.get("openrouter_key", "")
-if config.get("jwt_secret"):
-    AUTH_CONFIG["jwt_secret"] = config["jwt_secret"]
-OR_REFERER = config.get("openrouter_referer", "https://saurabh-ai.app")
-OR_TITLE = config.get("openrouter_title", "Saurabh AI")
+NVIDIA_KEYS = config.get("nvidia_keys", [])
 
 # Load Balancer State
 current_groq_index = {"index": 0, "lock": asyncio.Lock()}
-request_counts = {key: {"count": 0, "last_reset": asyncio.get_event_loop().time()} for key in GROQ_KEYS}
+current_nvidia_index = {"index": 0, "lock": asyncio.Lock()}
 
 # Rate limit settings
-RATE_LIMIT_REQUESTS = 30  # per minute
-RATE_LIMIT_WINDOW = 60  # seconds
+RATE_LIMIT_REQUESTS = 30
+RATE_LIMIT_WINDOW = 60
 
-# Model Behavior System - Each model has a unique personality
-MODEL_BEHAVIORS = {
+# ============== NVIDIA MODEL DATA ==============
+NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
+
+# All 92 NVIDIA Models with Categories and Rankings
+NVIDIA_MODELS = {
+    # REASONING MODELS
+    "deepseek-ai/deepseek-v3.2": {
+        "name": "DeepSeek V3.2",
+        "category": "reasoning",
+        "rank": 1,
+        "runs": "16.73M",
+        "description": "685B reasoning LLM with sparse attention",
+        "context": "128K"
+    },
+    "moonshotai/kimi-k2-instruct": {
+        "name": "Kimi K2",
+        "category": "reasoning",
+        "rank": 2,
+        "runs": "21.48M",
+        "description": "Mixture-of-experts with strong reasoning",
+        "context": "128K"
+    },
+    "deepseek-ai/deepseek-v3.1": {
+        "name": "DeepSeek V3.1",
+        "category": "reasoning",
+        "rank": 3,
+        "runs": "12.72M",
+        "description": "Fast reasoning, 128K context",
+        "context": "128K"
+    },
+    "moonshotai/kimi-k2-instruct-0905": {
+        "name": "Kimi K2 Long",
+        "category": "long_context",
+        "rank": 1,
+        "runs": "12.96M",
+        "description": "Longer context window, enhanced reasoning",
+        "context": "256K"
+    },
+    "qwen/qwq-32b": {
+        "name": "QwQ-32B",
+        "category": "reasoning",
+        "rank": 4,
+        "runs": "3.7M",
+        "description": "Reasoning model for hard problems",
+        "context": "32K"
+    },
+    "deepseek-ai/deepseek-r1": {
+        "name": "DeepSeek R1",
+        "category": "reasoning",
+        "rank": 5,
+        "runs": "High",
+        "description": "State-of-art reasoning model",
+        "context": "64K"
+    },
+    "marin/marin-8b-instruct": {
+        "name": "Marin 8B",
+        "category": "reasoning",
+        "rank": 6,
+        "runs": "472K",
+        "description": "Reasoning, math, and science",
+        "context": "8K"
+    },
+    
+    # CODING MODELS
+    "z-ai/glm-4.7": {
+        "name": "GLM-4.7",
+        "category": "coding",
+        "rank": 1,
+        "runs": "15.53M",
+        "description": "Coding partner with tool use",
+        "context": "128K"
+    },
+    "mistralai/devstral-2-123b-instruct-2512": {
+        "name": "Devstral 123B",
+        "category": "coding",
+        "rank": 2,
+        "runs": "5.86M",
+        "description": "SoTA open code model, 256K context",
+        "context": "256K"
+    },
+    "qwen/qwen3-coder-480b-a35b-instruct": {
+        "name": "Qwen3 Coder 480B",
+        "category": "coding",
+        "rank": 3,
+        "runs": "3.76M",
+        "description": "Agentic coding, 256K context",
+        "context": "256K"
+    },
+    "microsoft/phi-4": {
+        "name": "Phi-4",
+        "category": "coding",
+        "rank": 4,
+        "runs": "High",
+        "description": "Small, fast, great for coding",
+        "context": "16K"
+    },
+    "qwen/qwen2.5-coder-7b-instruct": {
+        "name": "Qwen2.5 Coder 7B",
+        "category": "coding",
+        "rank": 5,
+        "runs": "580K",
+        "description": "Mid-size code model",
+        "context": "32K"
+    },
+    "mistralai/mamba-codestral-7b-v0.1": {
+        "name": "Codestral 7B",
+        "category": "coding",
+        "rank": 6,
+        "runs": "571K",
+        "description": "Code completion model",
+        "context": "32K"
+    },
+    "ibm/granite-3.3-8b-instruct": {
+        "name": "Granite 8B",
+        "category": "coding",
+        "rank": 7,
+        "runs": "78K",
+        "description": "Reasoning and coding",
+        "context": "8K"
+    },
+    "tiiuae/falcon3-7b-instruct": {
+        "name": "Falcon 3 7B",
+        "category": "coding",
+        "rank": 8,
+        "runs": "2.01M",
+        "description": "Reasoning, math, coding",
+        "context": "8K"
+    },
+    
+    # TOOL CALLING / AGENTIC
+    "deepseek-ai/deepseek-v3_1-terminus": {
+        "name": "DeepSeek V3.1-T",
+        "category": "tool_calling",
+        "rank": 1,
+        "runs": "14.1M",
+        "description": "Think/Non-Think modes, function calling",
+        "context": "128K"
+    },
+    "mistralai/mistral-nemotron": {
+        "name": "Mistral Nemotron",
+        "category": "tool_calling",
+        "rank": 2,
+        "runs": "891K",
+        "description": "Agentic workflows, function calling",
+        "context": "128K"
+    },
+    "stepfun-ai/step-3.5-flash": {
+        "name": "Step 3.5 Flash",
+        "category": "agentic",
+        "rank": 1,
+        "runs": "9.48M",
+        "description": "200B reasoning engine, agentic AI",
+        "context": "128K"
+    },
+    "bytedance/seed-oss-36b-instruct": {
+        "name": "Seed-OSS 36B",
+        "category": "agentic",
+        "rank": 2,
+        "runs": "3.68M",
+        "description": "Long-context, reasoning, agentic",
+        "context": "128K"
+    },
+    "moonshotai/kimi-k2-thinking": {
+        "name": "Kimi K2 Thinking",
+        "category": "agentic",
+        "rank": 3,
+        "runs": "3.57M",
+        "description": "Native INT4, enhanced tool use",
+        "context": "256K"
+    },
+    
+    # VISION MODELS
+    "google/gemma-3-27b-it": {
+        "name": "Gemma 3 27B",
+        "category": "vision",
+        "rank": 1,
+        "runs": "6.37M",
+        "description": "Google's best open multimodal model",
+        "context": "8K"
+    },
+    "meta/llama-4-scout-17b-16e-instruct": {
+        "name": "Llama 4 Scout",
+        "category": "vision",
+        "rank": 2,
+        "runs": "24K",
+        "description": "10M context, multimodal",
+        "context": "10M"
+    },
+    "meta/llama-4-maverick-17b-128e-instruct": {
+        "name": "Llama 4 Maverick",
+        "category": "vision",
+        "rank": 3,
+        "runs": "6.19M",
+        "description": "General purpose multimodal",
+        "context": "128K"
+    },
+    "nvidia/cosmos-nemotron-34b": {
+        "name": "Cosmos Nemotron",
+        "category": "vision",
+        "rank": 4,
+        "runs": "14",
+        "description": "Text/img/video understanding",
+        "context": "8K"
+    },
+    "microsoft/phi-3.5-vision-instruct": {
+        "name": "Phi-3.5 Vision",
+        "category": "vision",
+        "rank": 5,
+        "runs": "614K",
+        "description": "Multimodal reasoning from images",
+        "context": "4K"
+    },
+    "google/google-paligemma": {
+        "name": "PaliGemma",
+        "category": "vision",
+        "rank": 6,
+        "runs": "243K",
+        "description": "Vision language model",
+        "context": "2K"
+    },
+    "google/gemma-2-27b-it": {
+        "name": "Gemma 2 27B",
+        "category": "vision",
+        "rank": 7,
+        "runs": "877K",
+        "description": "Text, code, vision",
+        "context": "8K"
+    },
+    "nvidia/internvl2-14b": {
+        "name": "InternVL2 14B",
+        "category": "vision",
+        "rank": 8,
+        "runs": "High",
+        "description": "Strong vision-language",
+        "context": "8K"
+    },
+    
+    # CHAT / GENERAL MODELS
+    "mistralai/mistral-large-3-675b-instruct-2512": {
+        "name": "Mistral Large 3",
+        "category": "chat",
+        "rank": 1,
+        "runs": "7.42M",
+        "description": "State-of-art general purpose MoE VLM",
+        "context": "128K"
+    },
+    "mistralai/mistral-small-3.1-24b-instruct-2503": {
+        "name": "Mistral Small 3.1",
+        "category": "chat",
+        "rank": 2,
+        "runs": "2.35M",
+        "description": "Efficient, multilingual, fast",
+        "context": "32K"
+    },
+    "mistralai/mistral-medium-3-instruct": {
+        "name": "Mistral Medium 3",
+        "category": "chat",
+        "rank": 3,
+        "runs": "4.75M",
+        "description": "Enterprise multimodal",
+        "context": "128K"
+    },
+    "microsoft/phi-3.5-mini-instruct": {
+        "name": "Phi-3.5 Mini",
+        "category": "chat",
+        "rank": 4,
+        "runs": "7.88M",
+        "description": "Multilingual, fast",
+        "context": "128K"
+    },
+    "mistralai/mistral-7b-instruct-v0.2": {
+        "name": "Mistral 7B",
+        "category": "chat",
+        "rank": 5,
+        "runs": "538K",
+        "description": "Instruction following, creative text",
+        "context": "8K"
+    },
+    "google/gemma-7b": {
+        "name": "Gemma 7B",
+        "category": "chat",
+        "rank": 6,
+        "runs": "656K",
+        "description": "Text understanding, code generation",
+        "context": "8K"
+    },
+    "mediatek/breeze-7b-instruct": {
+        "name": "Breeze 7B",
+        "category": "chat",
+        "rank": 7,
+        "runs": "443K",
+        "description": "Traditional Chinese focus",
+        "context": "8K"
+    },
+    "rakuten/rakutenai-7b-chat": {
+        "name": "RakutenAI 7B",
+        "category": "chat",
+        "rank": 8,
+        "runs": "442K",
+        "description": "Reasoning, text generation",
+        "context": "8K"
+    },
+    "qwen/qwen2-7b-instruct": {
+        "name": "Qwen2 7B",
+        "category": "chat",
+        "rank": 9,
+        "runs": "630K",
+        "description": "Chinese/English, coding, math",
+        "context": "8K"
+    },
+    "ai21labs/jamba-1.5-mini-instruct": {
+        "name": "Jamba 1.5 Mini",
+        "category": "chat",
+        "rank": 10,
+        "runs": "489K",
+        "description": "MoE based LLM",
+        "context": "8K"
+    },
+    
+    # MULTILINGUAL MODELS
+    "thudm/chatglm3-6b": {
+        "name": "ChatGLM3 6B",
+        "category": "multilingual",
+        "rank": 1,
+        "runs": "454K",
+        "description": "Chinese/English, translation",
+        "context": "8K"
+    },
+    "baichuan-inc/baichuan2-13b-chat": {
+        "name": "Baichuan 2 13B",
+        "category": "multilingual",
+        "rank": 2,
+        "runs": "453K",
+        "description": "Chinese/English chat, coding, math",
+        "context": "4K"
+    },
+    
+    # EMBEDDINGS MODELS
+    "nvidia/nv-embed-v1": {
+        "name": "NV-Embed v1",
+        "category": "embeddings",
+        "rank": 1,
+        "runs": "3.11M",
+        "description": "High-quality text embeddings",
+        "context": "N/A"
+    },
+    "nvidia/nv-embedcode-7b-v1": {
+        "name": "NV-EmbedCode 7B",
+        "category": "embeddings",
+        "rank": 2,
+        "runs": "231K",
+        "description": "Code retrieval embeddings",
+        "context": "N/A"
+    },
+    
+    # SAFETY MODELS
+    "meta/llama-guard-4-12b": {
+        "name": "Llama Guard 4",
+        "category": "safety",
+        "rank": 1,
+        "runs": "431K",
+        "description": "Safety classification",
+        "context": "8K"
+    },
+    "ibm/granite-guardian-3.0-8b": {
+        "name": "Granite Guardian 3.0",
+        "category": "safety",
+        "rank": 2,
+        "runs": "418K",
+        "description": "Jailbreak, bias, violence detection",
+        "context": "8K"
+    },
+    "nvidia/nemotron-content-safety-reasoning-4b": {
+        "name": "Nemotron Safety 4B",
+        "category": "safety",
+        "rank": 3,
+        "runs": "517K",
+        "description": "Context-aware safety reasoning",
+        "context": "4K"
+    },
+    
+    # TRANSLATION MODELS
+    "nvidia/riva-translate-4b-instruct-v1_1": {
+        "name": "Riva Translate 4B",
+        "category": "translation",
+        "rank": 1,
+        "runs": "492K",
+        "description": "12 languages translation",
+        "context": "4K"
+    },
+    
+    # TTS MODELS
+    "nvidia/magpie-tts-flow": {
+        "name": "Magpie TTS Flow",
+        "category": "tts",
+        "rank": 1,
+        "runs": "885",
+        "description": "Expressive text-to-speech",
+        "context": "N/A"
+    },
+    "nvidia/magpie-tts-zeroshot": {
+        "name": "Magpie TTS Zeroshot",
+        "category": "tts",
+        "rank": 2,
+        "runs": "1.5K",
+        "description": "Zero-shot voice cloning TTS",
+        "context": "N/A"
+    },
+    
+    # OTHER SPECIALIZED MODELS
+    "nvidia/nv-dinov2": {
+        "name": "NV-DINOv2",
+        "category": "vision",
+        "rank": 9,
+        "runs": "1.24M",
+        "description": "Visual foundation model embeddings",
+        "context": "N/A"
+    },
+    "nvidia/llama-3.1-nemotron-ultra-253b-v1": {
+        "name": "Nemotron Ultra",
+        "category": "reasoning",
+        "rank": 7,
+        "runs": "High",
+        "description": "NVIDIA's best general model",
+        "context": "128K"
+    },
+    "nvidia/llama-3.3-nemotron-super-49b-v1": {
+        "name": "Nemotron Super",
+        "category": "reasoning",
+        "rank": 8,
+        "runs": "High",
+        "description": "Strong math performance",
+        "context": "64K"
+    },
+    "openai/gpt-oss-120b": {
+        "name": "GPT-OSS 120B",
+        "category": "reasoning",
+        "rank": 9,
+        "runs": "High",
+        "description": "Largest open-weight model",
+        "context": "32K"
+    },
+    "google/gemma-3n-e2b-it": {
+        "name": "Gemma 3N E2B",
+        "category": "chat",
+        "rank": 11,
+        "runs": "614K",
+        "description": "Edge computing AI, text/audio/image",
+        "context": "8K"
+    },
+    "google/gemma-3n-e4b-it": {
+        "name": "Gemma 3N E4B",
+        "category": "chat",
+        "rank": 12,
+        "runs": "716K",
+        "description": "Edge computing AI",
+        "context": "8K"
+    },
+    "mistralai/magistral-small-2506": {
+        "name": "Magistral Small",
+        "category": "coding",
+        "rank": 9,
+        "runs": "3.6M",
+        "description": "High performance reasoning",
+        "context": "32K"
+    },
+    "nvidia/nemotron-4-mini-hindi-4b-instruct": {
+        "name": "Nemotron Hindi 4B",
+        "category": "multilingual",
+        "rank": 3,
+        "runs": "543K",
+        "description": "Hindi-English bilingual",
+        "context": "4K"
+    },
+    "nvidia/nemotron-mini-4b-instruct": {
+        "name": "Nemotron Mini 4B",
+        "category": "chat",
+        "rank": 13,
+        "runs": "494K",
+        "description": "On-device inference, RAG",
+        "context": "4K"
+    },
+    "microsoft/phi-3-medium-128k-instruct": {
+        "name": "Phi-3 Medium 128K",
+        "category": "long_context",
+        "rank": 2,
+        "runs": "467K",
+        "description": "Lightweight, high-quality reasoning",
+        "context": "128K"
+    },
+    "microsoft/phi-3-small-128k-instruct": {
+        "name": "Phi-3 Small 128K",
+        "category": "long_context",
+        "rank": 3,
+        "runs": "489K",
+        "description": "Long context, reasoning",
+        "context": "128K"
+    },
+    "microsoft/phi-4-mini-flash-reasoning": {
+        "name": "Phi-4 Flash Reasoning",
+        "category": "reasoning",
+        "rank": 10,
+        "runs": "451K",
+        "description": "Edge reasoning model",
+        "context": "4K"
+    },
+    "microsoft/phi-4-multimodal-instruct": {
+        "name": "Phi-4 Multimodal",
+        "category": "vision",
+        "rank": 10,
+        "runs": "454K",
+        "description": "Image and audio understanding",
+        "context": "16K"
+    },
+    "upstage/solar-10.7b-instruct": {
+        "name": "Solar 10.7B",
+        "category": "reasoning",
+        "rank": 11,
+        "runs": "459K",
+        "description": "Instruction-following, reasoning, math",
+        "context": "4K"
+    },
+    "speakleash/bielik-11b-v2.6-instruct": {
+        "name": "Bielik 11B",
+        "category": "chat",
+        "rank": 14,
+        "runs": "450K",
+        "description": "Polish language processing",
+        "context": "8K"
+    },
+    "aisingapore/sea-lion-7b-instruct": {
+        "name": "Sea Lion 7B",
+        "category": "chat",
+        "rank": 15,
+        "runs": "Low",
+        "description": "Southeast Asian languages",
+        "context": "8K"
+    },
+}
+
+# GROQ Model Behaviors
+GROQ_MODEL_BEHAVIORS = {
     "llama-3.3-70b-versatile": {
         "name": "Sage",
-        "personality": "wise, thoughtful, balanced",
-        "style": "Provide thorough explanations with examples. Be like a patient mentor who helps users understand the 'why' behind things. Answer directly, no introduction needed.",
-        "language": "Hinglish (Roman script)",
+        "category": "chat",
+        "rank": 1,
+        "description": "Best quality, balanced",
         "emoji_free": True
     },
     "llama-4-maverick-17b-128e-instruct": {
         "name": "Flash",
-        "personality": "quick, witty, efficient",
-        "style": "Give fast, concise answers. Use bullet points when possible. Be to-the-point.",
-        "language": "Mix of Hindi-English (Roman script)",
-        "emoji_free": False,
-        "emojis": "Light emojis only"
+        "category": "vision",
+        "rank": 1,
+        "description": "Fast, smart, multimodal",
+        "emoji_free": False
     },
     "deepseek-r1-distill-llama-70b": {
         "name": "Logic",
-        "personality": "analytical, logical, precise",
-        "style": "Think step-by-step. Break down complex problems. Show your reasoning process. Perfect for coding and math.",
-        "language": "English with technical precision",
+        "category": "reasoning",
+        "rank": 1,
+        "description": "Best reasoning, math, coding",
         "emoji_free": True
     },
     "qwen/qwen3-32b": {
         "name": "Poly",
-        "personality": "multilingual, creative, versatile",
-        "style": "Switch languages naturally. Great for translations, creative writing, and multilingual conversations.",
-        "language": "Multilingual - Hindi, English, and more",
-        "emoji_free": False,
-        "emojis": "Appropriate emojis"
+        "category": "multilingual",
+        "rank": 1,
+        "description": "Multilingual, creative",
+        "emoji_free": False
     },
     "llama-3.1-8b-instant": {
         "name": "Quick",
-        "personality": "fast, friendly, casual",
-        "style": "Give rapid responses. Casual and friendly. Perfect for quick questions.",
-        "language": "Casual Hinglish",
-        "emoji_free": False,
-        "emojis": "Fun emojis"
+        "category": "chat",
+        "rank": 2,
+        "description": "Fastest responses",
+        "emoji_free": False
     },
     "mixtral-8x7b-32768": {
         "name": "Balanced",
-        "personality": "balanced, helpful, adaptable",
-        "style": "Good for everything. Adapt to user's needs. Whether coding, chatting, or explaining.",
-        "language": "Natural Hinglish",
-        "emoji_free": False,
-        "emojis": "Relevant emojis"
+        "category": "chat",
+        "rank": 3,
+        "description": "Good for everything",
+        "emoji_free": False
     },
     "meta-llama/llama-4-scout-17b-16e-instruct": {
         "name": "Scout",
-        "personality": "explorative, curious, vision-aware",
-        "style": "Great with images and exploration. Describe things vividly. Perfect for image analysis and learning.",
-        "language": "Descriptive Hinglish",
-        "emoji_free": False,
-        "emojis": "Expressive emojis"
+        "category": "vision",
+        "rank": 2,
+        "description": "128K context, vision",
+        "emoji_free": False
     },
     "llama-3.2-90b-vision-preview": {
         "name": "Vision",
-        "personality": "observant, detailed, analytical",
-        "style": "Perfect for image analysis. Notice details others miss. Great for design feedback and visual content.",
-        "language": "Descriptive English",
+        "category": "vision",
+        "rank": 3,
+        "description": "Powerful image analysis",
         "emoji_free": True
     },
     "llama-3.2-11b-vision-preview": {
         "name": "Pixie",
-        "personality": "light, quick, visual",
-        "style": "Fast image analysis. Great for quick visual checks and descriptions.",
-        "language": "Quick Hinglish",
-        "emoji_free": False,
-        "emojis": "Playful emojis"
+        "category": "vision",
+        "rank": 4,
+        "description": "Fast vision",
+        "emoji_free": False
     },
     "llava-1.5-7b-4096-preview": {
         "name": "Art",
-        "personality": "artistic, creative, descriptive",
-        "style": "Creative descriptions of images. Great for art, design, and visual content.",
-        "language": "Creative Hinglish",
-        "emoji_free": False,
-        "emojis": "Artistic emojis"
-    }
+        "category": "vision",
+        "rank": 5,
+        "description": "Creative image analysis",
+        "emoji_free": False
+    },
 }
 
-# Default behavior for unknown models
+# ============== CATEGORY SYSTEM ==============
+CATEGORIES = {
+    "reasoning": {"name": "Reasoning", "icon": "🧠", "description": "Math, logic, problem-solving"},
+    "coding": {"name": "Coding", "icon": "💻", "description": "Code, scripts, debugging"},
+    "vision": {"name": "Vision", "icon": "👁️", "description": "Image analysis, multimodal"},
+    "chat": {"name": "Chat", "icon": "💬", "description": "General conversation"},
+    "tool_calling": {"name": "Tool Calling", "icon": "🔧", "description": "Function calling, agents"},
+    "agentic": {"name": "Agentic", "icon": "🤖", "description": "Autonomous agents"},
+    "long_context": {"name": "Long Context", "icon": "📚", "description": "Large documents"},
+    "multilingual": {"name": "Multilingual", "icon": "🌍", "description": "Translations"},
+    "safety": {"name": "Safety", "icon": "🛡️", "description": "Content moderation"},
+    "embeddings": {"name": "Embeddings", "icon": "📊", "description": "Text embeddings"},
+    "tts": {"name": "TTS", "icon": "🎙️", "description": "Text to speech"},
+    "translation": {"name": "Translation", "icon": "🔤", "description": "Language translation"},
+}
+
+# ============== MODEL RANKINGS BY CATEGORY ==============
+MODEL_RANKINGS = {
+    "reasoning": [
+        "deepseek-ai/deepseek-v3.2",
+        "moonshotai/kimi-k2-instruct",
+        "deepseek-ai/deepseek-v3.1",
+        "qwen/qwq-32b",
+        "deepseek-ai/deepseek-r1",
+        "marin/marin-8b-instruct",
+        "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+        "nvidia/llama-3.3-nemotron-super-49b-v1",
+        "openai/gpt-oss-120b",
+        "microsoft/phi-4-mini-flash-reasoning",
+        "upstage/solar-10.7b-instruct",
+        "deepseek-r1-distill-llama-70b",  # Groq
+    ],
+    "coding": [
+        "z-ai/glm-4.7",
+        "mistralai/devstral-2-123b-instruct-2512",
+        "qwen/qwen3-coder-480b-a35b-instruct",
+        "microsoft/phi-4",
+        "qwen/qwen2.5-coder-7b-instruct",
+        "mistralai/mamba-codestral-7b-v0.1",
+        "ibm/granite-3.3-8b-instruct",
+        "tiiuae/falcon3-7b-instruct",
+        "mistralai/magistral-small-2506",
+        "microsoft/phi-4-multimodal-instruct",
+    ],
+    "vision": [
+        "google/gemma-3-27b-it",
+        "meta/llama-4-scout-17b-16e-instruct",
+        "meta/llama-4-maverick-17b-128e-instruct",
+        "nvidia/cosmos-nemotron-34b",
+        "microsoft/phi-3.5-vision-instruct",
+        "google/google-paligemma",
+        "google/gemma-2-27b-it",
+        "nvidia/internvl2-14b",
+        "nvidia/nv-dinov2",
+        "microsoft/phi-4-multimodal-instruct",
+        "llama-4-scout-17b-16e-instruct",  # Groq
+        "llama-3.2-90b-vision-preview",  # Groq
+        "llama-3.2-11b-vision-preview",  # Groq
+        "llava-1.5-7b-4096-preview",  # Groq
+    ],
+    "chat": [
+        "mistralai/mistral-large-3-675b-instruct-2512",
+        "mistralai/mistral-small-3.1-24b-instruct-2503",
+        "mistralai/mistral-medium-3-instruct",
+        "microsoft/phi-3.5-mini-instruct",
+        "mistralai/mistral-7b-instruct-v0.2",
+        "google/gemma-7b",
+        "mediatek/breeze-7b-instruct",
+        "rakuten/rakutenai-7b-chat",
+        "qwen/qwen2-7b-instruct",
+        "ai21labs/jamba-1.5-mini-instruct",
+        "google/gemma-3n-e2b-it",
+        "google/gemma-3n-e4b-it",
+        "nvidia/nemotron-mini-4b-instruct",
+        "speakleash/bielik-11b-v2.6-instruct",
+        "aisingapore/sea-lion-7b-instruct",
+        "llama-3.3-70b-versatile",  # Groq
+        "llama-3.1-8b-instant",  # Groq
+        "mixtral-8x7b-32768",  # Groq
+    ],
+    "tool_calling": [
+        "deepseek-ai/deepseek-v3_1-terminus",
+        "mistralai/mistral-nemotron",
+        "z-ai/glm-4.7",
+        "moonshotai/kimi-k2-instruct",
+    ],
+    "agentic": [
+        "stepfun-ai/step-3.5-flash",
+        "bytedance/seed-oss-36b-instruct",
+        "moonshotai/kimi-k2-thinking",
+        "z-ai/glm-4.7",
+    ],
+    "long_context": [
+        "moonshotai/kimi-k2-instruct-0905",
+        "deepseek-ai/deepseek-v3.2",
+        "microsoft/phi-3-medium-128k-instruct",
+        "microsoft/phi-3-small-128k-instruct",
+        "mistralai/devstral-2-123b-instruct-2512",
+        "qwen/qwen3-coder-480b-a35b-instruct",
+    ],
+    "multilingual": [
+        "z-ai/glm-4.7",
+        "microsoft/phi-3.5-mini-instruct",
+        "thudm/chatglm3-6b",
+        "baichuan-inc/baichuan2-13b-chat",
+        "nvidia/nemotron-4-mini-hindi-4b-instruct",
+        "qwen/qwen2-7b-instruct",
+        "qwen/qwen3-32b",  # Groq
+    ],
+    "safety": [
+        "meta/llama-guard-4-12b",
+        "ibm/granite-guardian-3.0-8b",
+        "nvidia/nemotron-content-safety-reasoning-4b",
+    ],
+    "embeddings": [
+        "nvidia/nv-embed-v1",
+        "nvidia/nv-embedcode-7b-v1",
+    ],
+    "tts": [
+        "nvidia/magpie-tts-flow",
+        "nvidia/magpie-tts-zeroshot",
+    ],
+    "translation": [
+        "nvidia/riva-translate-4b-instruct-v1_1",
+        "thudm/chatglm3-6b",
+        "baichuan-inc/baichuan2-13b-chat",
+    ],
+}
+
+# ============== DEFAULT BEHAVIOR ==============
 DEFAULT_BEHAVIOR = {
     "name": "Saurabh AI",
     "personality": "helpful, friendly, intelligent",
-    "style": "Be helpful and informative. Answer in Hinglish. Be like a senior friend - direct and real. Never introduce yourself unless asked.",
+    "style": "Be helpful and informative. Answer in Hinglish. Be like a senior friend.",
     "language": "Hinglish",
     "emoji_free": False
 }
 
-# IDENTITY SYSTEM - Rules about who I am
-def apply_behavior_system(messages: list, model: str) -> list:
-    """Apply behavior system to messages - inject behavior via first user message"""
-    
-    behavior = MODEL_BEHAVIORS.get(model, DEFAULT_BEHAVIOR)
-    
-    # Get user message to understand context
-    user_message = ""
-    user_msg_obj = None
-    for msg in reversed(messages):
-        if msg.get("role") == "user":
-            user_message = msg.get("content", "").lower()
-            user_msg_obj = msg
-            break
-    
-    # Check if this is a first message (greeting)
-    is_greeting = any(g in user_message for g in ["hi", "hello", "namaste", "hey", "kaise ho", "sab theek", "sup"])
-    
-    if is_greeting and len(messages) == 1:
-        # For first greeting messages, prepend a conversation context
-        # This helps the model respond naturally instead of introducing itself
-        greeting_context = {
-            "role": "assistant",
-            "content": "Sure!"
-        }
-        messages = [greeting_context] + messages
-    
-    # Build behavior-specific system instruction
-    behavior_prompt = f"""{behavior['name']} personality: {behavior['personality']}
-Style: {behavior['style']}
-Language: {behavior['language']}
-
-IMPORTANT:
-- Never start with "Main Saurabh AI hoon" or self-introductions
-- Never say "How can I help you?"  
-- Only say who you are if asked directly
-- Respond naturally like a friend"""
-    
-    # Check if there's already a system message
-    has_system = any(m.get("role") == "system" for m in messages)
-    
-    if has_system:
-        # Modify existing system message
-        for msg in messages:
-            if msg.get("role") == "system":
-                msg["content"] = behavior_prompt
-                break
-    else:
-        # Add new system message at the beginning
-        messages = [{"role": "system", "content": behavior_prompt}] + messages
-    
-    return messages
-
+# ============== API FUNCTIONS ==============
 async def get_next_groq_key() -> Optional[str]:
-    """Get next available Groq key using round-robin with rate limiting"""
     if not GROQ_KEYS:
         return None
     
     async with current_groq_index["lock"]:
-        attempts = 0
-        max_attempts = len(GROQ_KEYS)
-        
-        while attempts < max_attempts:
-            idx = current_groq_index["index"]
-            current_groq_index["index"] = (current_groq_index["index"] + 1) % len(GROQ_KEYS)
-            
-            key = GROQ_KEYS[idx]
-            now = asyncio.get_event_loop().time()
-            
-            # Reset counter if window passed
-            if now - request_counts[key]["last_reset"] > RATE_LIMIT_WINDOW:
-                request_counts[key]["count"] = 0
-                request_counts[key]["last_reset"] = now
-            
-            # Check rate limit
-            if request_counts[key]["count"] < RATE_LIMIT_REQUESTS:
-                request_counts[key]["count"] += 1
-                return key
-            
-            attempts += 1
-        
-        # All keys rate limited, return first one anyway
-        return GROQ_KEYS[0] if GROQ_KEYS else None
+        idx = current_groq_index["index"]
+        current_groq_index["index"] = (current_groq_index["index"] + 1) % len(GROQ_KEYS)
+        return GROQ_KEYS[idx]
 
+async def get_next_nvidia_key() -> Optional[str]:
+    if not NVIDIA_KEYS:
+        return None
+    
+    async with current_nvidia_index["lock"]:
+        idx = current_nvidia_index["index"]
+        current_nvidia_index["index"] = (current_nvidia_index["index"] + 1) % len(NVIDIA_KEYS)
+        return NVIDIA_KEYS[idx]
 
 async def stream_from_groq(api_key: str, model: str, messages: list, stream: bool = True):
-    """Stream response from Groq API"""
     url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": stream,
+        "max_tokens": 2000,
+        "temperature": 0.75
+    }
+    
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        try:
+            async with client.stream("POST", url, headers=headers, json=payload) as response:
+                if response.status_code != 200:
+                    error_text = await response.aread()
+                    yield f"data: {{\"error\": \"Groq Error: {response.status_code}\"}}\n\n".encode()
+                    return
+                
+                async for line in response.aiter_lines():
+                    if line.strip():
+                        yield f"{line}\n".encode()
+        except Exception as e:
+            yield f"data: {{\"error\": \"Groq Connection: {str(e)}\"}}\n\n".encode()
+
+async def stream_from_nvidia(api_key: str, model: str, messages: list, stream: bool = True):
+    url = f"{NVIDIA_BASE_URL}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": stream,
+        "max_tokens": 2000,
+        "temperature": 0.75
+    }
+    
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        try:
+            async with client.stream("POST", url, headers=headers, json=payload) as response:
+                if response.status_code != 200:
+                    error_text = await response.aread()
+                    yield f"data: {{\"error\": \"NVIDIA Error: {response.status_code}\"}}\n\n".encode()
+                    return
+                
+                async for line in response.aiter_lines():
+                    if line.strip():
+                        yield f"{line}\n".encode()
+        except Exception as e:
+            yield f"data: {{\"error\": \"NVIDIA Connection: {str(e)}\"}}\n\n".encode()
+
+# ============== AI ANALYZER SYSTEM ==============
+CATEGORY_ANALYZER_PROMPT = """You are a smart model selector. Analyze the user's message and determine the best category.
+
+Categories:
+- reasoning: Math problems, logic puzzles, analytical thinking, step-by-step analysis
+- coding: Programming, scripts, debugging, code review, algorithms
+- vision: Image analysis, photo descriptions, visual content, multimodal input
+- chat: Casual conversation, greetings, simple questions, general chat
+- tool_calling: Agent tasks, function calling, automation workflows
+- agentic: Complex autonomous tasks, multi-step planning
+- long_context: Summarizing large documents, books, extensive content
+- multilingual: Translations between languages, multilingual content
+
+Respond ONLY with valid JSON (no markdown, no explanation):
+{
+  "category": "reasoning|coding|vision|chat|tool_calling|agentic|long_context|multilingual",
+  "confidence": 0.0-1.0,
+  "reason": "One sentence explanation"
+}"""
+
+async def analyze_message_category(message: str) -> dict:
+    """Use AI to analyze message and determine best category"""
+    api_key = await get_next_nvidia_key()
+    if not api_key:
+        api_key = await get_next_groq_key()
+    
+    if not api_key:
+        return {"category": "chat", "confidence": 0.5, "reason": "No API key available"}
+    
+    analyzer_model = "moonshotai/kimi-k2-instruct"  # Primary analyzer
     
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -355,199 +1000,197 @@ async def stream_from_groq(api_key: str, model: str, messages: list, stream: boo
     }
     
     payload = {
-        "model": model,
-        "messages": messages,
-        "stream": stream,
-        "max_tokens": 2000,
-        "temperature": 0.75
+        "model": analyzer_model,
+        "messages": [
+            {"role": "system", "content": CATEGORY_ANALYZER_PROMPT},
+            {"role": "user", "content": f"Analyze this message: {message}"}
+        ],
+        "max_tokens": 100,
+        "temperature": 0.1
     }
     
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        try:
-            async with client.stream("POST", url, headers=headers, json=payload) as response:
-                if response.status_code != 200:
-                    error_text = await response.aread()
-                    yield f"data: {{\"error\": \"API Error: {response.status_code}\"}}\n\n".encode()
-                    return
+    try:
+        if analyzer_model.startswith("moonshotai") or analyzer_model.startswith("deepseek") or analyzer_model.startswith("z-ai") or analyzer_model.startswith("mistralai") or analyzer_model.startswith("qwen") or analyzer_model.startswith("google") or analyzer_model.startswith("microsoft"):
+            url = f"{NVIDIA_BASE_URL}/chat/completions"
+        else:
+            url = "https://api.groq.com/openai/v1/chat/completions"
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            if response.status_code == 200:
+                result = response.json()
+                content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
                 
-                async for line in response.aiter_lines():
-                    if line.strip():
-                        yield f"{line}\n".encode()
-                        
-        except Exception as e:
-            yield f"data: {{\"error\": \"Connection error: {str(e)}\"}}\n\n".encode()
-
-
-async def stream_from_openrouter(api_key: str, model: str, messages: list, stream: bool = True):
-    """Stream response from OpenRouter API"""
-    url = "https://openrouter.ai/api/v1/chat/completions"
+                try:
+                    parsed = json.loads(content.strip())
+                    return parsed
+                except:
+                    for cat in ["reasoning", "coding", "vision", "chat", "tool_calling", "agentic", "long_context", "multilingual"]:
+                        if cat in content.lower():
+                            return {"category": cat, "confidence": 0.7, "reason": "Keyword match"}
+                    return {"category": "chat", "confidence": 0.5, "reason": "Fallback"}
+    except Exception as e:
+        print(f"[ANALYZER] Error: {e}")
     
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": OR_REFERER,
-        "X-Title": OR_TITLE
+    return {"category": "chat", "confidence": 0.5, "reason": "Analysis failed, using default"}
+
+def get_best_model_for_category(category: str, user_email: str = None) -> dict:
+    """Get the best ranked model for a category"""
+    rankings = MODEL_RANKINGS.get(category, MODEL_RANKINGS["chat"])
+    
+    if rankings:
+        best_model = rankings[0]
+        model_info = NVIDIA_MODELS.get(best_model, {})
+        
+        if not model_info:
+            # Check Groq models
+            groq_info = GROQ_MODEL_BEHAVIORS.get(best_model, {})
+            if groq_info:
+                return {
+                    "model_id": best_model,
+                    "name": groq_info.get("name", best_model),
+                    "category": category,
+                    "api": "groq",
+                    "rank": 1,
+                    "description": groq_info.get("description", "")
+                }
+        
+        return {
+            "model_id": best_model,
+            "name": model_info.get("name", best_model),
+            "category": category,
+            "api": "nvidia",
+            "rank": model_info.get("rank", 1),
+            "description": model_info.get("description", ""),
+            "runs": model_info.get("runs", "")
+        }
+    
+    # Default fallback
+    return {
+        "model_id": "deepseek-ai/deepseek-v3.2",
+        "name": "DeepSeek V3.2",
+        "category": "reasoning",
+        "api": "nvidia",
+        "rank": 1,
+        "description": "Best general reasoning model"
     }
-    
-    payload = {
-        "model": model,
-        "messages": messages,
-        "stream": stream,
-        "max_tokens": 2000,
-        "temperature": 0.75
-    }
-    
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        try:
-            async with client.stream("POST", url, headers=headers, json=payload) as response:
-                if response.status_code != 200:
-                    error_text = await response.aread()
-                    yield f"data: {{\"error\": \"API Error: {response.status_code}\"}}\n\n".encode()
-                    return
-                
-                async for line in response.aiter_lines():
-                    if line.strip():
-                        yield f"{line}\n".encode()
-                        
-        except Exception as e:
-            yield f"data: {{\"error\": \"Connection error: {str(e)}\"}}\n\n".encode()
 
-# Static files path
+# ============== STATIC FILES ==============
 STATIC_PATH = os.path.join(os.path.dirname(__file__), "..")
 
+# ============== ENDPOINTS ==============
 @app.get("/")
 async def root():
-    """Serve the frontend"""
     index_path = os.path.join(STATIC_PATH, "index.html")
     return FileResponse(index_path)
 
-
 @app.get("/auth/login-page")
 async def login_page():
-    """Serve the login page"""
-    import os
     login_path = os.path.join(os.path.dirname(__file__), "..", "auth", "login.html")
     return FileResponse(login_path)
 
-
 @app.get("/ping")
 async def ping():
-    """Lightweight ping for sleep detection - responds fast"""
     return {"pong": True}
-
 
 @app.get("/health")
 async def health_check():
-    """Detailed health check"""
-    active_keys = len([k for k in GROQ_KEYS if k and k != "YOUR_GROQ_API_KEY_1"])
-    
     return {
-        "status": "healthy" if active_keys > 0 else "degraded",
-        "groq_keys_total": len(GROQ_KEYS),
-        "groq_keys_active": active_keys,
-        "rate_limit_per_key": RATE_LIMIT_REQUESTS,
-        "rate_limit_window": f"{RATE_LIMIT_WINDOW} seconds"
+        "status": "healthy",
+        "groq_keys": len(GROQ_KEYS),
+        "nvidia_keys": len(NVIDIA_KEYS),
+        "total_models": len(NVIDIA_MODELS) + len(GROQ_MODEL_BEHAVIORS),
+        "version": "2.0.0"
     }
-
 
 @app.get("/models")
 async def get_models():
-    """Return available models with behavior info - Best Free Models on Groq"""
+    """Return all available models organized by category"""
+    models_by_category = {}
+    
+    for model_id, info in NVIDIA_MODELS.items():
+        cat = info["category"]
+        if cat not in models_by_category:
+            models_by_category[cat] = []
+        models_by_category[cat].append({
+            "id": model_id,
+            "name": info["name"],
+            "rank": info["rank"],
+            "runs": info["runs"],
+            "description": info["description"],
+            "context": info.get("context", ""),
+            "api": "nvidia"
+        })
+    
+    # Add Groq models
+    for model_id, info in GROQ_MODEL_BEHAVIORS.items():
+        cat = info["category"]
+        if cat not in models_by_category:
+            models_by_category[cat] = []
+        models_by_category[cat].append({
+            "id": model_id,
+            "name": info["name"],
+            "rank": info["rank"],
+            "description": info["description"],
+            "api": "groq"
+        })
+    
     return {
-        "text": [
-            {
-                "id": "auto", 
-                "name": "Auto Best (Recommended)", 
-                "api": "groq",
-                "behavior": MODEL_BEHAVIORS.get("llama-3.3-70b-versatile", DEFAULT_BEHAVIOR)
-            },
-            {
-                "id": "llama-3.3-70b-versatile", 
-                "name": "Sage - Llama 3.3 70B - Best Quality", 
-                "api": "groq",
-                "behavior": MODEL_BEHAVIORS.get("llama-3.3-70b-versatile", DEFAULT_BEHAVIOR)
-            },
-            {
-                "id": "llama-4-maverick-17b-128e-instruct", 
-                "name": "Flash - Llama 4 Maverick - Fast & Smart", 
-                "api": "groq",
-                "behavior": MODEL_BEHAVIORS.get("llama-4-maverick-17b-128e-instruct", DEFAULT_BEHAVIOR)
-            },
-            {
-                "id": "deepseek-r1-distill-llama-70b", 
-                "name": "Logic - DeepSeek R1 - Best Reasoning", 
-                "api": "groq",
-                "behavior": MODEL_BEHAVIORS.get("deepseek-r1-distill-llama-70b", DEFAULT_BEHAVIOR)
-            },
-            {
-                "id": "qwen/qwen3-32b", 
-                "name": "Poly - Qwen 3 32B - Multilingual", 
-                "api": "groq",
-                "behavior": MODEL_BEHAVIORS.get("qwen/qwen3-32b", DEFAULT_BEHAVIOR)
-            },
-            {
-                "id": "llama-3.1-8b-instant", 
-                "name": "Quick - Llama 3.1 8B - Fastest", 
-                "api": "groq",
-                "behavior": MODEL_BEHAVIORS.get("llama-3.1-8b-instant", DEFAULT_BEHAVIOR)
-            },
-            {
-                "id": "mixtral-8x7b-32768", 
-                "name": "Balanced - Mixtral 8x7B", 
-                "api": "groq",
-                "behavior": MODEL_BEHAVIORS.get("mixtral-8x7b-32768", DEFAULT_BEHAVIOR)
-            },
-        ],
-        "vision": [
-            {
-                "id": "meta-llama/llama-4-scout-17b-16e-instruct", 
-                "name": "Scout - Llama 4 Vision (128K)", 
-                "api": "groq", 
-                "supports_images": True,
-                "behavior": MODEL_BEHAVIORS.get("meta-llama/llama-4-scout-17b-16e-instruct", DEFAULT_BEHAVIOR)
-            },
-            {
-                "id": "llama-3.2-90b-vision-preview", 
-                "name": "Vision - Llama 3.2 90B - Powerful", 
-                "api": "groq", 
-                "supports_images": True,
-                "behavior": MODEL_BEHAVIORS.get("llama-3.2-90b-vision-preview", DEFAULT_BEHAVIOR)
-            },
-            {
-                "id": "llama-3.2-11b-vision-preview", 
-                "name": "Pixie - Llama 3.2 11B - Fast", 
-                "api": "groq", 
-                "supports_images": True,
-                "behavior": MODEL_BEHAVIORS.get("llama-3.2-11b-vision-preview", DEFAULT_BEHAVIOR)
-            },
-            {
-                "id": "llava-1.5-7b-4096-preview", 
-                "name": "Art - LLaVA 7B - Creative", 
-                "api": "groq", 
-                "supports_images": True,
-                "behavior": MODEL_BEHAVIORS.get("llava-1.5-7b-4096-preview", DEFAULT_BEHAVIOR)
-            },
-        ]
+        "categories": CATEGORIES,
+        "models_by_category": models_by_category,
+        "total_nvidia": len(NVIDIA_MODELS),
+        "total_groq": len(GROQ_MODEL_BEHAVIORS)
     }
 
+@app.get("/categories")
+async def get_categories():
+    """Return all categories"""
+    return {"categories": CATEGORIES}
 
-@app.get("/behaviors")
-async def get_behaviors():
-    """Return all model behaviors/personality system"""
-    return {
-        "behaviors": MODEL_BEHAVIORS,
-        "default": DEFAULT_BEHAVIOR,
-        "total_models": len(MODEL_BEHAVIORS)
-    }
+@app.post("/analyze-message")
+async def analyze_message(request: Request):
+    """AI-based message analyzer for auto model selection"""
+    try:
+        body = await request.json()
+        message = body.get("message", "")
+        
+        if not message:
+            return {"error": "Message is required"}
+        
+        result = await analyze_message_category(message)
+        
+        # Get best model for detected category
+        best_model = get_best_model_for_category(result["category"])
+        
+        return {
+            "category": result["category"],
+            "confidence": result["confidence"],
+            "reason": result.get("reason", ""),
+            "category_info": CATEGORIES.get(result["category"], {}),
+            "suggested_model": best_model
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
+@app.post("/auto-select-model")
+async def auto_select_model(request: Request):
+    """Get auto-selected model for a category"""
+    try:
+        body = await request.json()
+        category = body.get("category", "chat")
+        
+        best_model = get_best_model_for_category(category)
+        
+        return {
+            "success": True,
+            "model": best_model
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.post("/chat")
 async def chat(request: Request):
-    """
-    Main chat endpoint with load balancing + behavior system
-    Supports both Groq and OpenRouter
-    """
-    # Check authentication
+    """Main chat endpoint with Groq + NVIDIA support"""
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -564,137 +1207,60 @@ async def chat(request: Request):
     
     model = body.get("model", "llama-3.3-70b-versatile")
     messages = body.get("messages", [])
-    api_type = body.get("api_type", "groq")  # "groq" or "or"
-    skip_behavior = body.get("skip_behavior", False)  # Option to skip behavior system
+    api_type = body.get("api_type", "auto")
     
     if not messages:
         raise HTTPException(status_code=400, detail="Messages are required")
     
     # Handle auto model selection
-    if model == "auto":
-        model = "llama-3.3-70b-versatile"
-    
-    # Check if this is a simple greeting - handle it directly for better UX
-    user_message = ""
-    if messages:
-        last_msg = messages[-1]
-        if isinstance(last_msg, dict):
-            user_message = last_msg.get("content", "").lower().strip()
-        elif isinstance(last_msg, str):
-            user_message = last_msg.lower().strip()
-    
-    greeting_words = ["hi", "hello", "namaste", "hey", "hii", "yo", "sup"]
-    cleaned_msg = user_message.replace("!", "").replace(".", "").strip()
-    is_simple_greeting = cleaned_msg in greeting_words
-    
-    # For simple greetings, respond directly without calling the AI
-    if is_simple_greeting and len(messages) == 1:
-        greeting_responses = ["Namaste!", "Hi!", "Hello!", "Namaste! Sab theek?"]
-        import random
-        response_text = random.choice(greeting_responses)
+    if model == "auto" or model == "ai-selected":
+        # Analyze message and get best model
+        user_msg = ""
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                user_msg = msg.get("content", "")
+                break
         
-        async def greet_stream():
-            import json
-            chunk_id = f"chatcmpl-{os.urandom(12).hex()}"
-            yield f'data: {json.dumps({"id": chunk_id, "object": "chat.completion.chunk", "created": 1234567890, "model": model, "choices": [{"index": 0, "delta": {"role": "assistant", "content": ""}, "finish_reason": None}]})}\n\n'.encode()
+        if user_msg:
+            analysis = await analyze_message_category(user_msg)
+            best = get_best_model_for_category(analysis["category"])
+            model = best["model_id"]
             
-            for char in response_text:
-                yield f'data: {json.dumps({"id": chunk_id, "object": "chat.completion.chunk", "created": 1234567890, "model": model, "choices": [{"index": 0, "delta": {"content": char}, "finish_reason": None}]})}\n\n'.encode()
-                await asyncio.sleep(0.01)
-            
-            yield f'data: {json.dumps({"id": chunk_id, "object": "chat.completion.chunk", "created": 1234567890, "model": model, "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]})}\n\n'.encode()
-            yield b'data: [DONE]\n'
-        
-        return StreamingResponse(greet_stream(), media_type="text/event-stream")
+            # Determine API type
+            if best["api"] == "nvidia":
+                api_type = "nvidia"
+            else:
+                api_type = "groq"
     
-    # Apply behavior system unless skipped
-    if not skip_behavior:
-        messages = apply_behavior_system(messages, model)
+    # Check if NVIDIA model
+    is_nvidia_model = any(
+        model.startswith(prefix) 
+        for prefix in ["deepseek-ai/", "moonshotai/", "z-ai/", "mistralai/", "qwen/", "google/", "microsoft/", "meta/", "nvidia/", "ibm/", "tiiuae/", "thudm/", "baichuan-", "openai/", "stepfun-", "bytedance/", "upstage/", "speakleash/", "aisingapore/", "rakuten/", "mediatek/", "ai21labs/"]
+    )
     
     # Route to appropriate API
-    if api_type == "or":
-        # OpenRouter
-        if not OR_KEY or OR_KEY == "YOUR_OPENROUTER_API_KEY":
-            raise HTTPException(status_code=500, detail="OpenRouter API key not configured")
-        
+    if api_type == "nvidia" or is_nvidia_model:
+        api_key = await get_next_nvidia_key()
+        if not api_key:
+            raise HTTPException(status_code=500, detail="No NVIDIA API key available")
         return StreamingResponse(
-            stream_from_openrouter(OR_KEY, model, messages),
+            stream_from_nvidia(api_key, model, messages),
             media_type="text/event-stream"
         )
     else:
-        # Groq with load balancer
         api_key = await get_next_groq_key()
-        
-        if not api_key or api_key.startswith("YOUR_GROQ"):
-            raise HTTPException(status_code=500, detail="No valid Groq API key configured")
-        
+        if not api_key:
+            raise HTTPException(status_code=500, detail="No GROQ API key available")
         return StreamingResponse(
             stream_from_groq(api_key, model, messages),
             media_type="text/event-stream"
         )
-
-
-@app.post("/chat-with-key")
-async def chat_with_custom_key(request: Request):
-    """
-    Allow users to provide their own API key
-    For power users who want to use their own keys
-    """
-    try:
-        body = await request.json()
-    except:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
-    
-    api_key = body.get("api_key", "")
-    model = body.get("model", "llama-3.3-70b-versatile")
-    messages = body.get("messages", [])
-    provider = body.get("provider", "groq")  # "groq" or "openrouter"
-    
-    if not api_key:
-        raise HTTPException(status_code=500, detail="API key is required")
-    
-    if not messages:
-        raise HTTPException(status_code=500, detail="Messages are required")
-    
-    if provider == "openrouter":
-        return StreamingResponse(
-            stream_from_openrouter(api_key, model, messages),
-            media_type="text/event-stream"
-        )
-    else:
-        return StreamingResponse(
-            stream_from_groq(api_key, model, messages),
-            media_type="text/event-stream"
-        )
-
-
-@app.get("/image-models")
-async def get_image_models():
-    """Return available free image generation models"""
-    return {
-        "models": [
-            {"id": "flux", "name": "Flux", "description": "Best quality, photorealistic", "styles": ["photorealistic", "realistic", "detailed"]},
-            {"id": "turbo", "name": "Turbo", "description": "Fast generation, good quality", "styles": ["fast", "quick", "balanced"]},
-            {"id": "pixart", "name": "PixArt", "description": "Anime and art styles", "styles": ["anime", "art", "illustration"]},
-        ]
-    }
-
-
-@app.get("/pollinations-keys")
-async def get_pollinations_keys():
-    """Return Pollinations API keys for image generation"""
-    return {
-        "keys": POLLINATIONS_KEYS,
-        "count": len(POLLINATIONS_KEYS)
-    }
-
 
 @app.get("/generate-image")
 async def generate_image_endpoint(prompt: str, width: int = 1024, height: int = 1024, model: str = "flux"):
-    """Generate image using Pollinations AI with load balancing"""
-    api_key = random.choice(POLLINATIONS_KEYS)
+    """Generate image using Pollinations AI"""
     encoded_prompt = quote(prompt)
-    image_url = f"https://gen.pollinations.ai/image/{encoded_prompt}?width={width}&height={height}&model={model}&nologo=true&key={api_key}"
+    image_url = f"https://gen.pollinations.ai/image/{encoded_prompt}?width={width}&height={height}&model={model}&nologo=true"
     
     return {
         "status": "success",
@@ -702,127 +1268,12 @@ async def generate_image_endpoint(prompt: str, width: int = 1024, height: int = 
         "prompt": prompt,
         "width": width,
         "height": height,
-        "model": model,
-        "powered_by": "Pollinations AI"
+        "model": model
     }
 
-
 # ============== AUTH ENDPOINTS ==============
-
-@app.post("/auth/login-with-password")
-async def login_with_password(request: Request):
-    """
-    Alternative: Login with email + password (if user already has password)
-    Returns: {success, token, message}
-    """
-    try:
-        body = await request.json()
-        email = body.get("email")
-        password = body.get("password")
-        
-        if not email or not password:
-            raise HTTPException(status_code=400, detail="Email and password required")
-        
-        # Find user
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT password_hash FROM users WHERE gmail = ?", (email,))
-        result = cursor.fetchone()
-        
-        if not result:
-            conn.close()
-            raise HTTPException(status_code=401, detail="User not found. Please use OTP login.")
-        
-        stored_hash = result[0]
-        
-        # Verify password
-        if not verify_password(password, stored_hash):
-            conn.close()
-            raise HTTPException(status_code=401, detail="Incorrect password")
-        
-        # Update login
-        cursor.execute(
-            "UPDATE users SET last_login = ?, login_count = login_count + 1 WHERE gmail = ?",
-            (datetime.now().isoformat(), email)
-        )
-        conn.commit()
-        conn.close()
-        
-        token = create_jwt_token(email)
-        
-        return {
-            "success": True,
-            "message": "Login successful!",
-            "token": token,
-            "email": email
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/auth/register")
-async def register(request: Request):
-    """
-    Step 2: Register new user with password (first time)
-    Sends email to admin automatically
-    """
-    try:
-        body = await request.json()
-        email = body.get("email")
-        password = body.get("password")
-        
-        if not email or not password:
-            raise HTTPException(status_code=400, detail="Email and password required")
-        
-        # Validate password
-        if len(password) < 6:
-            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
-        
-        # Hash password
-        password_hash = hash_password(password)
-        
-        # Save to database
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        
-        # Check if already exists
-        cursor.execute("SELECT gmail FROM users WHERE gmail = ?", (email,))
-        if cursor.fetchone():
-            conn.close()
-            raise HTTPException(status_code=400, detail="User already exists")
-        
-        # Insert new user
-        cursor.execute(
-            "INSERT INTO users (gmail, password_hash, created_at, login_count) VALUES (?, ?, ?, ?)",
-            (email, password_hash, datetime.now().isoformat(), 1)
-        )
-        conn.commit()
-        conn.close()
-        
-        # Create session token
-        token = create_jwt_token(email)
-        
-        return {
-            "success": True,
-            "message": "Registration successful!",
-            "token": token,
-            "email": email
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.post("/auth/login")
 async def login(request: Request):
-    """
-    Step 3: Login with email and password (returning user)
-    """
     try:
         body = await request.json()
         email = body.get("email")
@@ -831,7 +1282,6 @@ async def login(request: Request):
         if not email or not password:
             raise HTTPException(status_code=400, detail="Email and password required")
         
-        # Find user in database
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT password_hash FROM users WHERE gmail = ?", (email,))
@@ -841,22 +1291,15 @@ async def login(request: Request):
             conn.close()
             raise HTTPException(status_code=401, detail="User not found. Please register first.")
         
-        stored_hash = result[0]
-        
-        # Verify password
-        if not verify_password(password, stored_hash):
+        if not verify_password(password, result[0]):
             conn.close()
             raise HTTPException(status_code=401, detail="Incorrect password")
         
-        # Update last login
-        cursor.execute(
-            "UPDATE users SET last_login = ?, login_count = login_count + 1 WHERE gmail = ?",
-            (datetime.now().isoformat(), email)
-        )
+        cursor.execute("UPDATE users SET last_login = ?, login_count = login_count + 1 WHERE gmail = ?",
+                       (datetime.now().isoformat(), email))
         conn.commit()
         conn.close()
         
-        # Create session token
         token = create_jwt_token(email)
         
         return {
@@ -865,16 +1308,54 @@ async def login(request: Request):
             "token": token,
             "email": email
         }
-        
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/auth/register")
+async def register(request: Request):
+    try:
+        body = await request.json()
+        email = body.get("email")
+        password = body.get("password")
+        
+        if not email or not password:
+            raise HTTPException(status_code=400, detail="Email and password required")
+        
+        if len(password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        
+        password_hash = hash_password(password)
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT gmail FROM users WHERE gmail = ?", (email,))
+        if cursor.fetchone():
+            conn.close()
+            raise HTTPException(status_code=400, detail="User already exists")
+        
+        cursor.execute("INSERT INTO users (gmail, password_hash, created_at, login_count) VALUES (?, ?, ?, ?)",
+                      (email, password_hash, datetime.now().isoformat(), 1))
+        conn.commit()
+        conn.close()
+        
+        token = create_jwt_token(email)
+        
+        return {
+            "success": True,
+            "message": "Registration successful!",
+            "token": token,
+            "email": email
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/auth/user-info")
 async def get_user_info(authorization: str = Header(None)):
-    """Get current user info (requires valid token)"""
     try:
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Authorization required")
@@ -885,13 +1366,9 @@ async def get_user_info(authorization: str = Header(None)):
         if not email:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
         
-        # Get user info from database
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT gmail, created_at, last_login, login_count FROM users WHERE gmail = ?",
-            (email,)
-        )
+        cursor.execute("SELECT gmail, created_at, last_login, login_count FROM users WHERE gmail = ?", (email,))
         result = cursor.fetchone()
         conn.close()
         
@@ -905,183 +1382,13 @@ async def get_user_info(authorization: str = Header(None)):
             "last_login": result[2],
             "login_count": result[3]
         }
-        
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/auth/logout")
-async def logout(authorization: str = Header(None)):
-    """Logout user (client should delete token)"""
-    return {
-        "success": True,
-        "message": "Logged out successfully"
-    }
-
-
-# ============== OTP LOGIN SYSTEM ==============
-
-# In-memory OTP store: { "email": "otp_code" }
-otp_store = {}
-
-def send_otp_email(recipient_email: str, otp_code: str) -> bool:
-    """Send OTP to user's Gmail using SMTP"""
-    import smtplib
-    from email.mime.text import MIMEText
-    from email.mime.multipart import MIMEMultipart
-    
-    SENDER_EMAIL = "quitsaurabhverma2008@gmail.com"
-    SENDER_PASSWORD = "hvjjxpqfspfcsqkm"
-    
-    message = MIMEMultipart("alternative")
-    message["Subject"] = "🔐 Your Saurabh AI OTP"
-    message["From"] = SENDER_EMAIL
-    message["To"] = recipient_email
-    
-    plain_text = f"Your Saurabh AI OTP is: {otp_code}\nIt is valid for 5 minutes."
-    
-    html_content = f"""
-    <html>
-      <body style="font-family: Arial, sans-serif; background: #f4f4f4; padding: 30px;">
-        <div style="max-width: 400px; margin: auto; background: white;
-                    border-radius: 12px; padding: 30px; text-align: center;
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
-          <h2 style="color: #333;">Your One-Time Password</h2>
-          <p style="color: #666;">Use this OTP to login to Saurabh AI:</p>
-          <div style="font-size: 40px; font-weight: bold; letter-spacing: 8px;
-                      color: #4f46e5; padding: 20px 0;">{otp_code}</div>
-          <p style="color: #999; font-size: 13px;">
-            This OTP is valid for <strong>5 minutes</strong>.<br>
-            Do not share it with anyone.
-          </p>
-        </div>
-      </body>
-    </html>
-    """
-    
-    message.attach(MIMEText(plain_text, "plain"))
-    message.attach(MIMEText(html_content, "html"))
-    
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp_server:
-        smtp_server.login(SENDER_EMAIL, SENDER_PASSWORD)
-        smtp_server.sendmail(SENDER_EMAIL, recipient_email, message.as_string())
-    
-    return True
-
-
-@app.post("/auth/send-otp")
-async def send_otp(request: Request):
-    """Send OTP to user's email"""
-    try:
-        import random
-        
-        body = await request.json()
-        email = body.get("email", "").strip().lower()
-        
-        if not email:
-            raise HTTPException(status_code=400, detail="Email is required")
-        
-        # Validate email format
-        import re
-        pattern = r'^[\w\.-]+@[\w\.-]+\.\w{2,}$'
-        if not re.match(pattern, email):
-            raise HTTPException(status_code=400, detail="Invalid email format")
-        
-        # Generate 6-digit OTP
-        otp_code = str(random.randint(100000, 999999))
-        
-        # Store OTP
-        otp_store[email] = otp_code
-        print(f"[OTP] OTP for {email}: {otp_code}")
-        
-        # Send OTP via email (with fallback)
-        email_sent = False
-        try:
-            send_otp_email(email, otp_code)
-            email_sent = True
-        except Exception as e:
-            print(f"[OTP] Email send error: {e}")
-        
-        # Return OTP in response for testing (since Render blocks outbound email)
-        return {
-            "success": True, 
-            "message": f"OTP sent! (Email: {'✓' if email_sent else '✗ (see console/logs)'})",
-            "otp": otp_code,  # For testing - remove in production!
-            "debug_mode": True
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/auth/verify-otp")
-async def verify_otp(request: Request):
-    """Verify OTP and create/login user"""
-    try:
-        body = await request.json()
-        email = body.get("email", "").strip().lower()
-        entered_otp = body.get("otp", "").strip()
-        
-        if not email or not entered_otp:
-            raise HTTPException(status_code=400, detail="Email and OTP are required")
-        
-        # Check stored OTP
-        stored_otp = otp_store.get(email)
-        if not stored_otp:
-            raise HTTPException(status_code=400, detail="No OTP found. Please request a new OTP")
-        
-        # Verify OTP
-        if entered_otp != stored_otp:
-            raise HTTPException(status_code=401, detail="Incorrect OTP. Try again.")
-        
-        # OTP matched - clear it
-        del otp_store[email]
-        
-        # Create or update user in database
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        
-        # Check if user exists
-        cursor.execute("SELECT gmail FROM users WHERE gmail = ?", (email,))
-        if not cursor.fetchone():
-            # Create new user (no password for OTP login)
-            cursor.execute(
-                "INSERT INTO users (gmail, password_hash, created_at, login_count) VALUES (?, ?, ?, ?)",
-                (email, "otp_login", datetime.now().isoformat(), 1)
-            )
-        else:
-            # Update login
-            cursor.execute(
-                "UPDATE users SET last_login = ?, login_count = login_count + 1 WHERE gmail = ?",
-                (datetime.now().isoformat(), email)
-            )
-        
-        conn.commit()
-        conn.close()
-        
-        # Create session token
-        token = create_jwt_token(email)
-        
-        return {
-            "success": True,
-            "message": f"Login successful! Welcome, {email}",
-            "token": token,
-            "email": email
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/auth/check-session")
 async def check_session(authorization: str = Header(None)):
-    """Check if session is valid"""
     try:
         if not authorization or not authorization.startswith("Bearer "):
             return {"valid": False}
@@ -1089,40 +1396,33 @@ async def check_session(authorization: str = Header(None)):
         token = authorization.replace("Bearer ", "")
         email = verify_jwt_token(token)
         
-        if email:
-            return {"valid": True, "email": email}
-        else:
-            return {"valid": False}
-            
+        return {"valid": bool(email), "email": email}
     except:
         return {"valid": False}
 
-
-# ============== STARTUP EVENT ==============
-
-# Startup event
+# ============== STARTUP ==============
 @app.on_event("startup")
 async def startup_event():
-    """Run on server startup"""
-    print("[STARTUP] Saurabh AI Backend Started!")
-    print(f"[CONFIG] Groq Keys loaded: {len(GROQ_KEYS)}")
-    print(f"[CONFIG] Pollinations Keys loaded: {len(POLLINATIONS_KEYS)}")
-    print(f"[CONFIG] Rate limit: {RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW} seconds")
-    print(f"[AUTH] Login System: Email + Password (No OTP)")
-
+    print("=" * 60)
+    print("[SAURABH AI] Backend v2.0.0 Started!")
+    print("=" * 60)
+    print(f"[CONFIG] GROQ Keys: {len(GROQ_KEYS)}")
+    print(f"[CONFIG] NVIDIA Keys: {len(NVIDIA_KEYS)}")
+    print(f"[CONFIG] NVIDIA Models: {len(NVIDIA_MODELS)}")
+    print(f"[CONFIG] GROQ Models: {len(GROQ_MODEL_BEHAVIORS)}")
+    print(f"[CONFIG] Total Models: {len(NVIDIA_MODELS) + len(GROQ_MODEL_BEHAVIORS)}")
+    print(f"[CONFIG] Categories: {len(CATEGORIES)}")
+    print("=" * 60)
 
 # Serve static files
 app.mount("/static", StaticFiles(directory=STATIC_PATH), name="static")
 app.mount("/js", StaticFiles(directory=STATIC_PATH + "/js"), name="js")
 app.mount("/css", StaticFiles(directory=STATIC_PATH + "/css"), name="css")
 
-# Serve memory_system.js from root
 @app.get("/memory_system.js")
 async def serve_memory():
-    """Serve memory system"""
     path = os.path.join(STATIC_PATH, "memory_system.js")
     return FileResponse(path)
-
 
 if __name__ == "__main__":
     import uvicorn
