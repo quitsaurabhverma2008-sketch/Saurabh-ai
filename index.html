@@ -1386,9 +1386,6 @@ function logout() {
 }
 
 const MODELS = [
-  // AUTO SELECT (AI will choose best model)
-  { id:'ai-selected', api:'auto', name:'🤖 AI Auto Select', color:'#d4845a', desc:'AI automatically selects best model', category:'auto' },
-  
   // GROQ MODELS (Updated - All Working)
   { id:'llama-3.3-70b-versatile', api:'groq', name:'🦙 Sage - Llama 3.3 70B', color:'#3b82f6', desc:'Best quality, balanced', category:'chat' },
   { id:'qwen/qwen3-32b', api:'groq', name:'🌐 Poly - Qwen 3 32B', color:'#06b6d4', desc:'Multilingual, creative', category:'multilingual' },
@@ -2116,49 +2113,6 @@ function showMsgs() {
 function scroll() { document.getElementById('chatArea').scrollTop=99999; }
 
 /* ═══════════════════════════════════════
-   AI ANALYZER - Smart Model Selection
-══════════════════════════════════════ */
-async function analyzeAndSelectModel(message) {
-  if (AppState.selModel.id !== 'ai-selected') {
-    return AppState.selModel.id;
-  }
-  
-  try {
-    const token = localStorage.getItem('saurabh_token');
-    const res = await fetch(API_BASE + '/analyze-message', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + (token || '')
-      },
-      body: JSON.stringify({ message: message })
-    });
-    
-    if (res.ok) {
-      const data = await res.json();
-      if (data.suggested_model) {
-        // Update pill to show selected model
-        const model = data.suggested_model;
-        document.getElementById('pillLabel').textContent = '🤖 ' + model.name;
-        document.getElementById('pillDot').style.background = '#22c55e';
-        document.getElementById('pillDot').style.boxShadow = '0 0 6px #22c55e88';
-        
-        // Show detection indicator
-        const categoryInfo = data.category_info || {};
-        showToast(`${categoryInfo.icon || '🤖'} ${categoryInfo.name || 'AI'} selected (${Math.round(data.confidence * 100)}%)`);
-        
-        return model.model_id;
-      }
-    }
-  } catch (e) {
-    console.log('Analyzer error:', e);
-  }
-  
-  // Fallback
-  return 'deepseek-ai/deepseek-v3.2';
-}
-
-/* ═══════════════════════════════════════
    STREAM
 ══════════════════════════════════════ */
 async function stream(isImg, imgSrc, userTxt) {
@@ -2178,16 +2132,8 @@ async function stream(isImg, imgSrc, userTxt) {
 
   let useModel = AppState.selModel.id;
   
-  // AI Auto Selection - analyze message and select best model
-  if (useModel === 'ai-selected' && !isImg) {
-    useModel = await analyzeAndSelectModel(userTxt);
-  } else if (useModel === 'ai-selected' && isImg) {
-    // For images, use vision model
-    useModel = 'google/gemma-3-27b-it';
-  }
-  
   // Legacy auto fallback
-  if (useModel === 'auto') useModel = 'llama-3.3-70b-versatile';
+  if (useModel === 'auto' || useModel === 'ai-selected') useModel = 'llama-3.3-70b-versatile';
   
   // Vision models for images
   if (isImg && useModel.includes('groq')) {
