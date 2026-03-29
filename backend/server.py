@@ -199,19 +199,11 @@ NVIDIA_MODELS = {
         "context": "8K"
     },
     
-    # CODING MODELS
-    "z-ai/glm-4.7": {
-        "name": "GLM-4.7",
-        "category": "coding",
-        "rank": 1,
-        "runs": "15.53M",
-        "description": "Coding partner with tool use",
-        "context": "128K"
-    },
+    # CODING MODELS (Verified working)
     "mistralai/devstral-2-123b-instruct-2512": {
         "name": "Devstral 123B",
         "category": "coding",
-        "rank": 2,
+        "rank": 1,
         "runs": "5.86M",
         "description": "SoTA open code model, 256K context",
         "context": "256K"
@@ -219,23 +211,15 @@ NVIDIA_MODELS = {
     "qwen/qwen3-coder-480b-a35b-instruct": {
         "name": "Qwen3 Coder 480B",
         "category": "coding",
-        "rank": 3,
+        "rank": 2,
         "runs": "3.76M",
         "description": "Agentic coding, 256K context",
         "context": "256K"
     },
-    "microsoft/phi-4": {
-        "name": "Phi-4",
-        "category": "coding",
-        "rank": 4,
-        "runs": "High",
-        "description": "Small, fast, great for coding",
-        "context": "16K"
-    },
     "qwen/qwen2.5-coder-7b-instruct": {
         "name": "Qwen2.5 Coder 7B",
         "category": "coding",
-        "rank": 5,
+        "rank": 3,
         "runs": "580K",
         "description": "Mid-size code model",
         "context": "32K"
@@ -243,26 +227,10 @@ NVIDIA_MODELS = {
     "mistralai/mamba-codestral-7b-v0.1": {
         "name": "Codestral 7B",
         "category": "coding",
-        "rank": 6,
+        "rank": 4,
         "runs": "571K",
         "description": "Code completion model",
         "context": "32K"
-    },
-    "ibm/granite-3.3-8b-instruct": {
-        "name": "Granite 8B",
-        "category": "coding",
-        "rank": 7,
-        "runs": "78K",
-        "description": "Reasoning and coding",
-        "context": "8K"
-    },
-    "tiiuae/falcon3-7b-instruct": {
-        "name": "Falcon 3 7B",
-        "category": "coding",
-        "rank": 8,
-        "runs": "2.01M",
-        "description": "Reasoning, math, coding",
-        "context": "8K"
     },
     
     # TOOL CALLING / AGENTIC
@@ -769,93 +737,63 @@ CATEGORIES = {
 # ============== MODEL RANKINGS BY CATEGORY ==============
 MODEL_RANKINGS = {
     "reasoning": [
-        "deepseek-ai/deepseek-v3.2",
-        "moonshotai/kimi-k2-instruct",
+        "deepseek-ai/deepseek-v3.2",        # VERIFIED WORKING
+        "moonshotai/kimi-k2-instruct",      # VERIFIED WORKING
+        "qwen/qwq-32b",                     # VERIFIED WORKING
         "deepseek-ai/deepseek-v3.1",
-        "qwen/qwq-32b",
-        "deepseek-ai/deepseek-r1",
-        "marin/marin-8b-instruct",
-        "nvidia/llama-3.1-nemotron-ultra-253b-v1",
-        "nvidia/llama-3.3-nemotron-super-49b-v1",
-        "openai/gpt-oss-120b",
-        "microsoft/phi-4-mini-flash-reasoning",
-        "upstage/solar-10.7b-instruct",
-        "deepseek-r1-distill-llama-70b",  # Groq
+        "deepseek-r1-distill-llama-70b",    # Groq
     ],
     "coding": [
-        "z-ai/glm-4.7",
-        "mistralai/devstral-2-123b-instruct-2512",
-        "qwen/qwen3-coder-480b-a35b-instruct",
-        "microsoft/phi-4",
-        "qwen/qwen2.5-coder-7b-instruct",
-        "mistralai/mamba-codestral-7b-v0.1",
-        "ibm/granite-3.3-8b-instruct",
-        "tiiuae/falcon3-7b-instruct",
-        "mistralai/magistral-small-2506",
-        "microsoft/phi-4-multimodal-instruct",
+        "mistralai/devstral-2-123b-instruct-2512",  # VERIFIED WORKING
+        "qwen/qwen3-coder-480b-a35b-instruct",      # VERIFIED WORKING
+        "qwen/qwen2.5-coder-7b-instruct",           # VERIFIED WORKING
+        "mistralai/mamba-codestral-7b-v0.1",         # VERIFIED WORKING
     ],
     "vision": [
-        "google/gemma-3-27b-it",
-        "meta/llama-4-scout-17b-16e-instruct",
-        "meta/llama-4-maverick-17b-128e-instruct",
-        "nvidia/cosmos-nemotron-34b",
+        "google/gemma-3-27b-it",            # VERIFIED WORKING
+        "meta/llama-4-maverick-17b-128e-instruct",  # VERIFIED WORKING
         "microsoft/phi-3.5-vision-instruct",
         "google/google-paligemma",
         "google/gemma-2-27b-it",
         "nvidia/internvl2-14b",
-        "nvidia/nv-dinov2",
-        "microsoft/phi-4-multimodal-instruct",
-        "llama-4-scout-17b-16e-instruct",  # Groq
-        "llama-3.2-90b-vision-preview",  # Groq
-        "llama-3.2-11b-vision-preview",  # Groq
-        "llava-1.5-7b-4096-preview",  # Groq
+        "llama-3.2-90b-vision-preview",     # Groq
+        "llama-3.2-11b-vision-preview",     # Groq
+        "llava-1.5-7b-4096-preview",        # Groq
     ],
     "chat": [
-        "mistralai/mistral-large-3-675b-instruct-2512",
-        "mistralai/mistral-small-3.1-24b-instruct-2503",
-        "mistralai/mistral-medium-3-instruct",
-        "microsoft/phi-3.5-mini-instruct",
-        "mistralai/mistral-7b-instruct-v0.2",
-        "google/gemma-7b",
-        "mediatek/breeze-7b-instruct",
-        "rakuten/rakutenai-7b-chat",
+        "mistralai/mistral-large-3-675b-instruct-2512",  # VERIFIED WORKING
+        "mistralai/mistral-small-3.1-24b-instruct-2503", # VERIFIED WORKING
+        "mistralai/mistral-medium-3-instruct",            # VERIFIED WORKING
+        "microsoft/phi-3.5-mini-instruct",                 # VERIFIED WORKING
+        "mistralai/mistral-7b-instruct-v0.2",             # VERIFIED WORKING
+        "google/gemma-7b",                                 # VERIFIED WORKING
+        "nvidia/nemotron-4-mini-hindi-4b-instruct",       # VERIFIED WORKING
         "qwen/qwen2-7b-instruct",
-        "ai21labs/jamba-1.5-mini-instruct",
-        "google/gemma-3n-e2b-it",
-        "google/gemma-3n-e4b-it",
-        "nvidia/nemotron-mini-4b-instruct",
-        "speakleash/bielik-11b-v2.6-instruct",
-        "aisingapore/sea-lion-7b-instruct",
-        "llama-3.3-70b-versatile",  # Groq
-        "llama-3.1-8b-instant",  # Groq
-        "mixtral-8x7b-32768",  # Groq
+        "llama-3.3-70b-versatile",      # Groq
+        "llama-3.1-8b-instant",         # Groq
+        "mixtral-8x7b-32768",           # Groq
     ],
     "tool_calling": [
         "deepseek-ai/deepseek-v3_1-terminus",
         "mistralai/mistral-nemotron",
-        "z-ai/glm-4.7",
         "moonshotai/kimi-k2-instruct",
     ],
     "agentic": [
         "stepfun-ai/step-3.5-flash",
         "bytedance/seed-oss-36b-instruct",
         "moonshotai/kimi-k2-thinking",
-        "z-ai/glm-4.7",
     ],
     "long_context": [
         "moonshotai/kimi-k2-instruct-0905",
         "deepseek-ai/deepseek-v3.2",
-        "microsoft/phi-3-medium-128k-instruct",
-        "microsoft/phi-3-small-128k-instruct",
         "mistralai/devstral-2-123b-instruct-2512",
         "qwen/qwen3-coder-480b-a35b-instruct",
     ],
     "multilingual": [
-        "z-ai/glm-4.7",
+        "nvidia/nemotron-4-mini-hindi-4b-instruct",  # VERIFIED WORKING
         "microsoft/phi-3.5-mini-instruct",
         "thudm/chatglm3-6b",
         "baichuan-inc/baichuan2-13b-chat",
-        "nvidia/nemotron-4-mini-hindi-4b-instruct",
         "qwen/qwen2-7b-instruct",
         "qwen/qwen3-32b",  # Groq
     ],
