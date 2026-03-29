@@ -234,14 +234,7 @@ NVIDIA_MODELS = {
     },
     
     # TOOL CALLING / AGENTIC
-    "deepseek-ai/deepseek-v3_1-terminus": {
-        "name": "DeepSeek V3.1-T",
-        "category": "tool_calling",
-        "rank": 1,
-        "runs": "14.1M",
-        "description": "Think/Non-Think modes, function calling",
-        "context": "128K"
-    },
+    # DeepSeek V3.1-T removed - returns 404
     "mistralai/mistral-nemotron": {
         "name": "Mistral Nemotron",
         "category": "tool_calling",
@@ -653,20 +646,6 @@ GROQ_MODEL_BEHAVIORS = {
         "description": "Best quality, balanced",
         "emoji_free": True
     },
-    "llama-4-maverick-17b-128e-instruct": {
-        "name": "Flash",
-        "category": "vision",
-        "rank": 1,
-        "description": "Fast, smart, multimodal",
-        "emoji_free": False
-    },
-    "deepseek-r1-distill-llama-70b": {
-        "name": "Logic",
-        "category": "reasoning",
-        "rank": 1,
-        "description": "Best reasoning, math, coding",
-        "emoji_free": True
-    },
     "qwen/qwen3-32b": {
         "name": "Poly",
         "category": "multilingual",
@@ -681,39 +660,39 @@ GROQ_MODEL_BEHAVIORS = {
         "description": "Fastest responses",
         "emoji_free": False
     },
-    "mixtral-8x7b-32768": {
-        "name": "Balanced",
-        "category": "chat",
-        "rank": 3,
-        "description": "Good for everything",
-        "emoji_free": False
-    },
     "meta-llama/llama-4-scout-17b-16e-instruct": {
         "name": "Scout",
         "category": "vision",
-        "rank": 2,
+        "rank": 1,
         "description": "128K context, vision",
         "emoji_free": False
     },
-    "llama-3.2-90b-vision-preview": {
-        "name": "Vision",
-        "category": "vision",
-        "rank": 3,
-        "description": "Powerful image analysis",
-        "emoji_free": True
-    },
-    "llama-3.2-11b-vision-preview": {
-        "name": "Pixie",
-        "category": "vision",
-        "rank": 4,
-        "description": "Fast vision",
+    "moonshotai/kimi-k2-instruct": {
+        "name": "Kimi K2",
+        "category": "reasoning",
+        "rank": 1,
+        "description": "MoE, 128K, all-rounder",
         "emoji_free": False
     },
-    "llava-1.5-7b-4096-preview": {
-        "name": "Art",
-        "category": "vision",
-        "rank": 5,
-        "description": "Creative image analysis",
+    "moonshotai/kimi-k2-instruct-0905": {
+        "name": "Kimi K2 Long",
+        "category": "long_context",
+        "rank": 1,
+        "description": "256K context",
+        "emoji_free": False
+    },
+    "openai/gpt-oss-120b": {
+        "name": "GPT-OSS",
+        "category": "reasoning",
+        "rank": 2,
+        "description": "Large open-weight model",
+        "emoji_free": True
+    },
+    "groq/compound": {
+        "name": "Compound",
+        "category": "chat",
+        "rank": 3,
+        "description": "Groq's compound model",
         "emoji_free": False
     },
 }
@@ -774,7 +753,6 @@ MODEL_RANKINGS = {
         "mixtral-8x7b-32768",           # Groq
     ],
     "tool_calling": [
-        "deepseek-ai/deepseek-v3_1-terminus",
         "mistralai/mistral-nemotron",
         "moonshotai/kimi-k2-instruct",
     ],
@@ -874,6 +852,7 @@ async def stream_from_groq(api_key: str, model: str, messages: list, stream: boo
             yield f"data: {{\"error\": \"Groq Connection: {str(e)}\"}}\n\n".encode()
 
 async def stream_from_nvidia(api_key: str, model: str, messages: list, stream: bool = True):
+    import time
     url = f"{NVIDIA_BASE_URL}/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -887,18 +866,42 @@ async def stream_from_nvidia(api_key: str, model: str, messages: list, stream: b
         "temperature": 0.75
     }
     
+    start_time = time.time()
+    print(f"[NVIDIA] Starting stream for {model}")
+    
     async with httpx.AsyncClient(timeout=120.0) as client:
         try:
             async with client.stream("POST", url, headers=headers, json=payload) as response:
+                elapsed = time.time() - start_time
+                print(f"[NVIDIA] Got response in {elapsed:.2f}s with status {response.status_code}")
+                
                 if response.status_code != 200:
                     error_text = await response.aread()
+                    print(f"[NVIDIA] Error {response.status_code}: {error_text[:200]}")
                     yield f"data: {{\"error\": \"NVIDIA Error: {response.status_code}\"}}\n\n".encode()
                     return
                 
+                line_count = 0
                 async for line in response.aiter_lines():
                     if line.strip():
+                        line_count += 1
+                        if line_count <= 3:  # Log first few lines
+                            print(f"[NVIDIA] Line {line_count}: {line[:100]}")
                         yield f"{line}\n".encode()
+                
+                elapsed = time.time() - start_time
+                print(f"[NVIDIA] Stream completed in {elapsed:.2f}s with {line_count} lines")
+                
+                # If no lines received, send a fallback response
+                if line_count == 0:
+                    print(f"[NVIDIA] No lines received for {model}, sending fallback")
+                    fallback_data = '{"id":"chatcmpl-fallback","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"Model responded but sent empty content."},"finish_reason":null}]}'
+                    yield f"data: {fallback_data}\n\n".encode()
+                    yield b"data: [DONE]\n\n"
+                    
         except Exception as e:
+            elapsed = time.time() - start_time
+            print(f"[NVIDIA] Exception after {elapsed:.2f}s: {str(e)}")
             yield f"data: {{\"error\": \"NVIDIA Connection: {str(e)}\"}}\n\n".encode()
 
 # ============== AI ANALYZER SYSTEM ==============
@@ -921,56 +924,45 @@ Respond ONLY with valid JSON (no markdown, no explanation):
   "reason": "One sentence explanation"
 }"""
 
-async def analyze_message_category(message: str) -> dict:
-    """Use AI to analyze message and determine best category"""
-    api_key = await get_next_nvidia_key()
-    if not api_key:
-        api_key = await get_next_groq_key()
+def analyze_message_category(message: str) -> dict:
+    """Simple keyword-based category analysis"""
+    message_lower = message.lower()
     
-    if not api_key:
-        return {"category": "chat", "confidence": 0.5, "reason": "No API key available"}
+    # Coding keywords
+    coding_keywords = ["code", "program", "function", "python", "javascript", "java", "c++", "html", "css", 
+                      "debug", "error", "compile", "syntax", "algorithm", "data structure", "api", "database",
+                      "sql", "query", "script", "developer", "coding", "software", "app", "website"]
     
-    analyzer_model = "moonshotai/kimi-k2-instruct"  # Primary analyzer
+    # Reasoning keywords
+    reasoning_keywords = ["solve", "calculate", "math", "problem", "logic", "puzzle", "equation", "proof",
+                         "analyze", "explain why", "how does", "what is the reason", "calculate", "compute"]
     
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
+    # Vision keywords (for image analysis)
+    vision_keywords = ["image", "picture", "photo", "describe this image", "what do you see", "analyze image",
+                      "look at", "visual", "screenshot", "upload"]
     
-    payload = {
-        "model": analyzer_model,
-        "messages": [
-            {"role": "system", "content": CATEGORY_ANALYZER_PROMPT},
-            {"role": "user", "content": f"Analyze this message: {message}"}
-        ],
-        "max_tokens": 100,
-        "temperature": 0.1
-    }
+    # Multilingual keywords
+    multilingual_keywords = ["translate", "hindi", "spanish", "french", "german", "language", "meaning",
+                            "how to say", "what does", "in english", "in hindi", "in spanish"]
     
-    try:
-        if analyzer_model.startswith("moonshotai") or analyzer_model.startswith("deepseek") or analyzer_model.startswith("z-ai") or analyzer_model.startswith("mistralai") or analyzer_model.startswith("qwen") or analyzer_model.startswith("google") or analyzer_model.startswith("microsoft"):
-            url = f"{NVIDIA_BASE_URL}/chat/completions"
-        else:
-            url = "https://api.groq.com/openai/v1/chat/completions"
-        
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, headers=headers, json=payload)
-            if response.status_code == 200:
-                result = response.json()
-                content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-                
-                try:
-                    parsed = json.loads(content.strip())
-                    return parsed
-                except:
-                    for cat in ["reasoning", "coding", "vision", "chat", "tool_calling", "agentic", "long_context", "multilingual"]:
-                        if cat in content.lower():
-                            return {"category": cat, "confidence": 0.7, "reason": "Keyword match"}
-                    return {"category": "chat", "confidence": 0.5, "reason": "Fallback"}
-    except Exception as e:
-        print(f"[ANALYZER] Error: {e}")
+    # Check for coding
+    if any(keyword in message_lower for keyword in coding_keywords):
+        return {"category": "coding", "confidence": 0.8, "reason": "Coding-related keywords detected"}
     
-    return {"category": "chat", "confidence": 0.5, "reason": "Analysis failed, using default"}
+    # Check for reasoning
+    if any(keyword in message_lower for keyword in reasoning_keywords):
+        return {"category": "reasoning", "confidence": 0.8, "reason": "Reasoning/math keywords detected"}
+    
+    # Check for vision (image analysis)
+    if any(keyword in message_lower for keyword in vision_keywords):
+        return {"category": "vision", "confidence": 0.7, "reason": "Image/visual keywords detected"}
+    
+    # Check for multilingual
+    if any(keyword in message_lower for keyword in multilingual_keywords):
+        return {"category": "multilingual", "confidence": 0.7, "reason": "Translation/language keywords detected"}
+    
+    # Default to chat for general conversation
+    return {"category": "chat", "confidence": 0.9, "reason": "General conversation"}
 
 def get_best_model_for_category(category: str, user_email: str = None) -> dict:
     """Get the best ranked model for a category"""
@@ -1160,7 +1152,7 @@ async def chat(request: Request):
                 break
         
         if user_msg:
-            analysis = await analyze_message_category(user_msg)
+            analysis = analyze_message_category(user_msg)
             best = get_best_model_for_category(analysis["category"])
             model = best["model_id"]
             
