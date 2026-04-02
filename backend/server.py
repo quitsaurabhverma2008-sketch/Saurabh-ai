@@ -1267,6 +1267,48 @@ async def login(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/auth/login-with-password")
+async def login_with_password(request: Request):
+    return await login(request)
+    try:
+        body = await request.json()
+        email = body.get("email")
+        password = body.get("password")
+        
+        if not email or not password:
+            raise HTTPException(status_code=400, detail="Email and password required")
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT password_hash FROM users WHERE gmail = ?", (email,))
+        result = cursor.fetchone()
+        
+        if not result:
+            conn.close()
+            raise HTTPException(status_code=401, detail="User not found. Please register first.")
+        
+        if not verify_password(password, result[0]):
+            conn.close()
+            raise HTTPException(status_code=401, detail="Incorrect password")
+        
+        cursor.execute("UPDATE users SET last_login = ?, login_count = login_count + 1 WHERE gmail = ?",
+                       (datetime.now().isoformat(), email))
+        conn.commit()
+        conn.close()
+        
+        token = create_jwt_token(email)
+        
+        return {
+            "success": True,
+            "message": "Login successful!",
+            "token": token,
+            "email": email
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/auth/register")
 async def register(request: Request):
     try:
