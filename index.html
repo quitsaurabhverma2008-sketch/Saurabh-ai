@@ -1970,10 +1970,33 @@ function renderSidebar() {
   document.getElementById('chatsToggleBtn').style.transform = 'rotate(180deg)';
   el.querySelectorAll('.chat-item').forEach(item => {
     let pt;
-    item.addEventListener('touchstart', e=>{pt=setTimeout(()=>showDelPopup(e,item.dataset.id),500)}, {passive:true});
-    item.addEventListener('touchend', ()=>clearTimeout(pt));
-    item.addEventListener('touchmove', ()=>clearTimeout(pt));
-    item.addEventListener('contextmenu', e=>{e.preventDefault();showDelPopup(e,item.dataset.id);});
+    item.addEventListener('touchstart', function(e) {
+      // Show delete option on long press
+      pt = setTimeout(() => {
+        e.preventDefault();
+        e.stopPropagation();
+        const popup = document.getElementById('delPopup');
+        const rect = this.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        popup.style.left = Math.min(x, window.innerWidth - 170) + 'px';
+        popup.style.top = Math.min(y, window.innerHeight - 70) + 'px';
+        AppState.delPopupId = this.dataset.id;
+        popup.classList.add('show');
+      }, 400);
+    }, { passive: false });
+    item.addEventListener('touchend', (e) => {
+      clearTimeout(pt);
+      // Small delay to prevent immediate close
+      setTimeout(() => {
+        document.getElementById('delPopup').classList.remove('show');
+      }, 100);
+    });
+    item.addEventListener('touchmove', () => clearTimeout(pt));
+    item.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      showDelPopup(e, item.dataset.id);
+    });
   });
 }
 
@@ -2390,11 +2413,26 @@ function escHtml(s) {
 /* ═══════════════════════════════════════
    GLOBAL EVENTS
 ═══════════════════════════════════════ */
-document.addEventListener('click', ()=>{
+document.addEventListener('click', (e)=>{
+  // Don't close dropdown if clicking inside model dropdown or its children
+  if (e.target.closest('#modelDrop') || e.target.closest('#modelPill')) {
+    return;
+  }
+  // Don't close delPopup if clicking inside it
+  if (e.target.closest('#delPopup')) {
+    return;
+  }
   closeDrop();
   document.getElementById('attMenu').classList.remove('open');
   document.getElementById('delPopup').classList.remove('show');
 });
+
+// Prevent model dropdown from closing when scrolling
+document.addEventListener('touchmove', (e) => {
+  if (e.target.closest('#modelDrop')) {
+    e.stopPropagation();
+  }
+}, { passive: true });
 
 /* ═══════════════════════════════════════
    PWA — Service Worker
