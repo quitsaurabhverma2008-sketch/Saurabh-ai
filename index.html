@@ -1783,7 +1783,11 @@ async function initApp() {
   if (pillEl) {
     pillEl.addEventListener('touchstart', function(e) {
       e.preventDefault();
+      e.stopPropagation();
       toggleDrop(e);
+    }, {passive: false});
+    pillEl.addEventListener('touchend', function(e) {
+      e.preventDefault();
     }, {passive: false});
   }
   
@@ -1854,7 +1858,7 @@ function buildDrop() {
     const apiBadge = m.api === 'nvidia' ? '<span style="font-size:9px;background:#22c55e22;color:#22c55e;padding:2px 6px;border-radius:8px;margin-left:6px">NVIDIA</span>' : 
                      m.api === 'groq' ? '<span style="font-size:9px;background:#f59e0b22;color:#f59e0b;padding:2px 6px;border-radius:8px;margin-left:6px">GROQ</span>' : '';
     return `
-    <div class="drop-item ${AppState.selModel.id===m.id?'active':''}" onclick="pickModel('${m.id}')">
+    <div class="drop-item ${AppState.selModel.id===m.id?'active':''}" data-model-id="${m.id}" onclick="pickModel('${m.id}')">
       <div class="drop-dot" style="background:${m.color};box-shadow:0 0 6px ${m.color}88"></div>
       <div class="drop-info"><div class="drop-name">${m.name}${apiBadge}</div><div class="drop-desc">${m.desc}</div></div>
       <div class="drop-check">✓</div>
@@ -1870,12 +1874,27 @@ function buildDrop() {
   </style>`;
   
   document.getElementById('modelList').innerHTML = style + '<div class="cat-tabs">' + categoryTabs + '</div>' + modelList;
+  setupModelItemTouchHandlers();
 }
 
 function filterByCategory(cat) {
   selectedCategory = cat;
   buildDrop();
+  setupModelItemTouchHandlers();
 }
+
+// Touch handlers for model dropdown items
+function setupModelItemTouchHandlers() {
+  const items = document.querySelectorAll('.drop-item');
+  items.forEach(item => {
+    item.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      const modelId = this.getAttribute('data-model-id');
+      if (modelId) pickModel(modelId);
+    });
+  });
+}
+
 function toggleDrop(e) {
   e.preventDefault();
   e.stopPropagation();
@@ -1891,6 +1910,7 @@ function pickModel(id) {
   dot.style.background = AppState.selModel.color;
   dot.style.boxShadow = `0 0 6px ${AppState.selModel.color}88`;
   buildDrop();
+  setTimeout(() => closeDrop(), 50);
 }
 function closeDrop() {
   AppState.dropOpen = false;
