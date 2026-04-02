@@ -161,12 +161,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
 .pill-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .pill-arr{width:10px;height:10px;transition:transform .2s;color:var(--text3)}
 .pill.open .pill-arr{transform:rotate(180deg)}
-.pill-drop{display:none;position:absolute;top:calc(100% + 10px);left:50%;transform:translateX(-50%);width:310px;background:rgba(10,9,18,.97);border:1px solid var(--border2);border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.95);z-index:500;padding:8px;max-height:68dvh;overflow-y:auto;backdrop-filter:blur(30px)}
+.pill-drop{display:none;position:absolute;top:calc(100% + 10px);left:50%;transform:translateX(-50%);width:310px;background:rgba(10,9,18,.97);border:1px solid var(--border2);border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.95);z-index:500;padding:8px;max-height:68dvh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;backdrop-filter:blur(30px)}
 .pill-drop::-webkit-scrollbar{width:2px}
 .pill-drop::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 .pill-drop.open{display:block;animation:dropIn .18s ease}
 .drop-head{padding:8px 10px 4px;font-size:9px;color:var(--text3);font-weight:600;letter-spacing:2px;text-transform:uppercase}
-.drop-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:9px;cursor:pointer;transition:background .12s}
+.drop-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:9px;cursor:pointer;transition:background .12s;touch-action:manipulation}
 .drop-item:hover{background:var(--surface2)}
 .drop-item.active{background:rgba(212,132,90,.1)}
 .drop-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
@@ -2413,9 +2413,17 @@ function escHtml(s) {
 /* ═══════════════════════════════════════
    GLOBAL EVENTS
 ═══════════════════════════════════════ */
+// Track if touch is happening inside dropdown
+let isTouchInDropdown = false;
+
 document.addEventListener('click', (e)=>{
   // Don't close dropdown if clicking inside model dropdown or its children
+  // Also don't close if this click is part of a touch scroll
   if (e.target.closest('#modelDrop') || e.target.closest('#modelPill')) {
+    if (isTouchInDropdown) {
+      isTouchInDropdown = false;
+      return; // This was a touch scroll, don't close
+    }
     return;
   }
   // Don't close delPopup if clicking inside it
@@ -2427,10 +2435,23 @@ document.addEventListener('click', (e)=>{
   document.getElementById('delPopup').classList.remove('show');
 });
 
-// Prevent model dropdown from closing when scrolling
+// Handle touch events for model dropdown scrolling
+document.addEventListener('touchstart', (e) => {
+  if (e.target.closest('#modelDrop')) {
+    isTouchInDropdown = true;
+  }
+}, { passive: true });
+
 document.addEventListener('touchmove', (e) => {
   if (e.target.closest('#modelDrop')) {
-    e.stopPropagation();
+    isTouchInDropdown = true;
+  }
+}, { passive: true });
+
+document.addEventListener('touchend', (e) => {
+  if (e.target.closest('#modelDrop')) {
+    // Keep flag true briefly after touch ends, then clear
+    setTimeout(() => { isTouchInDropdown = false; }, 300);
   }
 }, { passive: true });
 
